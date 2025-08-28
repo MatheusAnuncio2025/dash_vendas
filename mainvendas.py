@@ -115,8 +115,9 @@ if __name__ == "__main__":
             )
             df_excel_mes_vigente = add_missing_columns(df_excel_mes_vigente, all_possible_cols)
             dfs_mes_vigente.append(df_excel_mes_vigente)
-            api_data_inicio = hoje
-            print(f"   - O Excel foi carregado. A API buscará apenas os dados de hoje ({hoje.strftime('%d/%m/%Y')}).")
+            ontem = hoje - timedelta(days=1)
+            api_data_inicio = ontem
+            print(f"   - O Excel foi carregado. A API buscará apenas os dados de ontem ({ontem.strftime('%d/%m/%Y')}).")
         else:
             print(f"   - Arquivo Excel '{current_month_name_pt}.xlsx' NÃO encontrado.")
             api_data_inicio = hoje.replace(day=1)
