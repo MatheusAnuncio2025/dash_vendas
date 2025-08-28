@@ -39,11 +39,16 @@ echo.
 echo [PASSO 3 de 4] Gerando o executavel... Isso pode demorar alguns minutos.
 pyinstaller --onefile ^
     --name="ProcessadorDeVendas" ^
-    --add-data "skilful-firefly-434016-b2-e08690ec5004.json;." ^
+    --add-data "skilful-firefly-434016-b2-364eae284f30.json;." ^
     --add-data "dados_bling;dados_bling" ^
     --add-data "Relatorio_vendas;Relatorio_vendas" ^
+    --add-data "Relatorio Canais;Relatorio Canais" ^
     --hidden-import="google.cloud.bigquery" ^
     --hidden-import="pandas._libs.tslibs.timedeltas" ^
+    --hidden-import="tabulate._formats" ^
+    --hidden-import="tabulate._html" ^
+    --hidden-import="tabulate._latex" ^
+    --hidden-import="tabulate._textutils" ^
     mainvendas.py
 
 IF %ERRORLEVEL% NEQ 0 (

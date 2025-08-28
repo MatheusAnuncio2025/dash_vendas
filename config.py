@@ -2,33 +2,44 @@ import pandas as pd
 from google.cloud import bigquery
 import os
 import decimal
+import sys
+
+def resolve_path(relative_path):
+    """ 
+    Obtém o caminho absoluto para o recurso, funcionando tanto no modo de 
+    desenvolvimento quanto no PyInstaller.
+    """
+    try:
+        # PyInstaller cria uma pasta temporária e armazena o caminho em _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        # Se não estiver empacotado, o caminho base é o diretório do arquivo de script
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
 
 # --- Configuração Geral ---
-# Caminhos de Arquivo
-# Caminho para o arquivo Markdown de saída principal do dashboard
-ARQUIVO_SAIDA_MD = 'base_dash_relatorio_vendas.md'
 
-# Caminho para o arquivo CSV de produtos do Bling
-ARQUIVO_BLING_PRODUTOS_CSV = 'C:\\Users\\grupo\\OneDrive\\Documentos\\VS Code\\Relatorio_vendas\\dados_bling\\relatorio_bling_otimizado.csv'
+# Caminhos de Arquivo (AGORA RESOLVIDOS DINAMICAMENTE PARA O EXECUTÁVEL)
+# O executável irá procurar por esses arquivos e pastas no mesmo diretório onde ele está.
+ARQUIVO_SAIDA_MD = resolve_path('base_dash_relatorio_vendas.md')
+ARQUIVO_BLING_PRODUTOS_CSV = resolve_path(os.path.join('dados_bling', 'relatorio_bling_otimizado.csv'))
+ARQUIVO_HISTORICO_VENDAS_MD = resolve_path('base_dash_relatorio_vendas.md') # Se for o mesmo arquivo de saída
 
-# NOVO: Caminho para o arquivo Markdown com o histórico de vendas para projeção
-ARQUIVO_HISTORICO_VENDAS_MD = 'C:\\Users\\grupo\\OneDrive\\Documentos\\VS Code\\Relatorio_vendas\\base_dash_relatorio_vendas.md'
-
-# Lista de caminhos para os arquivos ZIP da Shopee
 ARQUIVOS_SHOPEE_ZIP = [
-    'C:\\Users\\grupo\\OneDrive\\Documents\\VS Code\\Relatorio_vendas\\Relatório Canais\\shopee_nanu.zip',
-    'C:\\Users\\grupo\\OneDrive\\Documents\\VS Code\\Relatorio_vendas\\Relatório Canais\\shopee_mada.zip',
-    'C:\\Users\\grupo\\OneDrive\\Documents\\VS Code\\Relatorio_vendas\\Relatório Canais\\shopee_daril.zip',
+    resolve_path(os.path.join('Relatorio Canais', 'shopee_nanu.zip')),
+    resolve_path(os.path.join('Relatorio Canais', 'shopee_mada.zip')),
+    resolve_path(os.path.join('Relatorio Canais', 'shopee_daril.zip')),
 ]
 
-# Caminho para a pasta com múltiplos arquivos de relatório de vendas (Excel)
-PASTA_RELATORIOS_VENDAS = 'C:\\Users\\grupo\\OneDrive\\Documentos\\VS Code\\Relatorio_vendas\\Relatorio_vendas\\'
+PASTA_RELATORIOS_VENDAS = resolve_path('Relatorio_vendas' + os.sep) # Adicionado os.sep para garantir que seja uma pasta
 
 # Detalhes do Projeto Google Cloud
 ID_PROJETO = 'skilful-firefly-434016-b2'
 ID_DATASET = 'relatorio_vendas'
 ID_TABELA = 'base_dash_relatorio_vendas'
-ARQUIVO_CONTA_SERVICO = "skilful-firefly-434016-b2-e08690ec5004.json"
+# O nome do arquivo JSON deve corresponder ao que você está incluindo no build.bat
+ARQUIVO_CONTA_SERVICO = resolve_path("skilful-firefly-434016-b2-364eae284f30.json") 
 
 # Detalhes para as tabelas de Pareto no BigQuery
 ID_DATASET_PARETO = 'relatorio_pareto'
@@ -79,7 +90,7 @@ ESQUEMA_BIGQUERY = [
     bigquery.SchemaField("Estq", "INTEGER"),
     bigquery.SchemaField("Categoria", "STRING"),
     bigquery.SchemaField("Subcategoria", "STRING"),
-    bigquery.SchemaField("tipo_de_venda", "STRING"), # NOVO: Campo adicionado ao esquema
+    bigquery.SchemaField("tipo_de_venda", "STRING"),
 ]
 
 # Esquema do BigQuery para as tabelas de Pareto
@@ -149,9 +160,6 @@ MAPEAMENTO_MAGIS5_BIGQUERY = {
     'shipping_number': 'rastreio',
     'logistic_type': 'tipo_logistica',
 }
-
-# --- Caminhos de Saída de Dados Temporários ---
-ARQUIVO_SAIDA_MAGIS5_PROCESSADO_EXCEL = "C:\\Users\\grupo\\OneDrive\\Documents\\VS Code\\Relatorio_vendas\\Dados_magis\\magis5_data.xlsx"
 
 # --- Padronização de Status e Tipos de Logística ---
 PADRONIZACAO_STATUS = {

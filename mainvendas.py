@@ -278,6 +278,9 @@ if __name__ == "__main__":
         print("\n✅ Processamento completo concluído com sucesso!")
         print("Programa finalizado.")
 
+        print("Programa finalizado. A janela fechará em 20 segundos...")
+        time.sleep(20) # Adiciona a pausa de 20 segundos aqui
+
     except FileNotFoundError as e:
         print(f"❌ ERRO: Arquivo não encontrado: {e}. Verifique se a pasta '{config.PASTA_RELATORIOS_VENDAS}' e os arquivos ZIP necessários existem.")
         sys.exit(1)
