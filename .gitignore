@@ -1,0 +1,55 @@
+# Arquivo .gitignore para projeto de Análise de Dados/Dashboard com Python
+
+# ----------------------------------------------------------------
+# 1. SEGURANÇA (ARQUIVOS SENSÍVEIS)
+# NUNCA ENVIE ESTES ARQUIVOS PARA O GITHUB!
+*.json
+*.env
+*.spec
+
+# ----------------------------------------------------------------
+# 2. AMBIENTES VIRTUAIS E DEPENDÊNCIAS
+/venv/
+/env/
+/.venv/
+/.env/
+
+# ----------------------------------------------------------------
+# 3. PYTHON (CACHE E PACOTES)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+build/
+dist/
+wheels/
+pip-wheel-metadata/
+
+# ----------------------------------------------------------------
+# 4. DADOS E RELATÓRIOS GERADOS
+# Pastas contendo dados brutos e relatórios
+/Relatorio_VENDAS/
+/Dados_magis/
+/Relatório Canais/
+
+# Arquivos de dados específicos (caso não estejam nas pastas acima)
+*.csv
+*.xlsx
+*.xls
+*.db
+*.sqlite
+*.sqlite3
+*.md
+
+# ----------------------------------------------------------------
+# 5. EDITOR E SISTEMA OPERACIONAL
+.vscode/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+
+# ----------------------------------------------------------------
+# 6. ARQUIVOS ESPECÍFICOS PARA IGNORAR
+# Adicionando o relatório principal que não deve ser versionado.
+base_dash_relatorio_vendas.md
