@@ -1,73 +1,13 @@
 @echo OFF
 echo.
-echo =================================================================
-echo           SCRIPT PARA GERAR O EXECUTAVEL DO PROJETO
-echo =================================================================
-echo.
+echo [PASSO 1 de 2] Gerando o arquivo de especificacao (.spec)...
 
-REM --- Passo 1: Criar e ativar o ambiente virtual ---
-echo [PASSO 1 de 4] Verificando o ambiente virtual...
-IF NOT EXIST venv (
-    echo    -> Criando ambiente virtual 'venv'...
-    python -m venv venv
-    IF %ERRORLEVEL% NEQ 0 (
-        echo.
-        echo X ERRO: Falha ao criar o ambiente virtual. Verifique se o Python esta no PATH.
-        pause
-        exit /b
-    )
-)
-
-echo    -> Ativando o ambiente virtual...
 call .\venv\Scripts\activate.bat
-
-REM --- Passo 2: Instalar dependencias ---
-echo.
-echo [PASSO 2 de 4] Instalando dependencias do projeto e o PyInstaller...
-pip install -r requirements.txt
-pip install pyinstaller
-
-IF %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo X ERRO: Falha ao instalar as dependencias. Verifique o arquivo requirements.txt e sua conexao.
-    pause
-    exit /b
-)
-
-REM --- Passo 3: Gerar o executavel com PyInstaller ---
-echo.
-echo [PASSO 3 de 4] Gerando o executavel... Isso pode demorar alguns minutos.
-pyinstaller --onefile ^
-    --name="ProcessadorDeVendas" ^
-    --add-data "skilful-firefly-434016-b2-364eae284f30.json;." ^
-    --add-data "dados_bling;dados_bling" ^
-    --add-data "Relatorio_vendas;Relatorio_vendas" ^
-    --add-data "Relatorio Canais;Relatorio Canais" ^
-    --hidden-import="google.cloud.bigquery" ^
-    --hidden-import="pandas._libs.tslibs.timedeltas" ^
-    --hidden-import="tabulate._formats" ^
-    --hidden-import="tabulate._html" ^
-    --hidden-import="tabulate._latex" ^
-    --hidden-import="tabulate._textutils" ^
-    mainvendas.py
-
-IF %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo X ERRO: O PyInstaller falhou ao gerar o executavel. Verifique os logs acima.
-    pause
-    exit /b
-)
-
-REM --- Passo 4: Finalizacao ---
-echo.
-echo [PASSO 4 de 4] Limpando arquivos temporarios...
-rmdir /S /Q build
-del ProcessadorDeVendas.spec
+pyinstaller --onefile --name="ProcessadorDeVendas" mainvendas.py
 
 echo.
-echo =================================================================
-echo      EXECUTAVEL GERADO COM SUCESSO!
-echo      Voce pode encontra-lo em: .\dist\ProcessadorDeVendas.exe
-echo =================================================================
+echo [PASSO 2 de 2] Arquivo 'ProcessadorDeVendas.spec' gerado!
+echo.
+echo >> IMPORTANTE: Agora, copie o conteudo que a Karen te enviou para dentro deste arquivo e rode o proximo comando.
 echo.
 pause
