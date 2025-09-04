@@ -163,7 +163,7 @@ def fetch_all_products_from_bling(access_token):
                    "Valor Unitario": f"{product.get('precoCusto', 0.0):.2f}".replace('.', ',')
                })
            page += 1
-           time.sleep(1)
+           time.sleep(2)
        except requests.exceptions.RequestException as e:
            print(f"\nErro ao buscar produtos na página {page}: {e}")
            if response is not None:
