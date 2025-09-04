@@ -37,6 +37,9 @@ def add_missing_columns(df, all_cols_schema):
 
 if __name__ == "__main__":
     try:
+        # ★★★ NOVO: Linha de verificação adicionada aqui ★★★
+        print("\n--- [VERIFICAÇÃO KAREN] INICIANDO EXECUÇÃO DA VERSÃO ATUALIZADA DO mainvendas.py ---")
+
         # 0. Initial Setup and Authentication
         data_loaders.autenticar_gcp()
         print("Iniciando o processo de carga e transformação de dados de vendas...")
