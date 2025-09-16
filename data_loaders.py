@@ -222,13 +222,13 @@ def carregar_vendas_magis5_api(api_url, api_key, page_size, mapping_cols, data_i
 
 def carregar_dados_bling_csv():
     """
-    Carrega os dados de produtos do Bling a partir do CSV.
+    Carrega os dados de produtos a partir do CSV gerado pelo mainbling.py (que agora usa a planilha Google).
     Renomeia as colunas e pré-processa para o DataFrame principal.
     """
     print(
-        f"\n🔗 Carregando dados de produtos do Bling a partir do CSV: '{config.ARQUIVO_BLING_PRODUTOS_CSV}'...")
+        f"\n🔗 Carregando dados de produtos do arquivo CSV: '{config.ARQUIVO_BLING_PRODUTOS_CSV}'...")
 
-    # ALTERADO: Adicionado 'tipo_de_venda' às colunas esperadas do CSV
+    # Colunas esperadas do CSV gerado a partir da planilha
     expected_bling_cols_for_merge = ['sku', 'custo_unitario', 'Estq',
                                      'titulo_bling', 'Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']
 
@@ -247,20 +247,18 @@ def carregar_dados_bling_csv():
             decimal=','
         )
 
-        # ALTERADO: Adicionado 'Tipo de Venda' ao mapeamento de renomeação
+        # Mapeamento para o merge, baseado nos nomes das colunas do CSV
         df_bling = df_bling.rename(columns={
             'Código': 'sku',
             'Quantidade': 'Estq',
             'Valor Unitario': 'custo_unitario',
             'Produto': 'titulo_bling',
-            'Fornecedor': 'Fornecedores',
-            'Categoria': 'Categoria',
-            'Subcategoria': 'Subcategoria',
+            'Fornecedor': 'Fornecedores', # Mantido para compatibilidade, caso o CSV tenha esse nome
             'Tipo de Venda': 'tipo_de_venda'
         })
 
         if 'sku' not in df_bling.columns:
-            print("⚠️ Coluna 'sku' não encontrada no CSV do Bling após renomeio. Não será possível mesclar os dados.")
+            print("⚠️ Coluna 'sku' não encontrada no CSV após renomeio. Não será possível mesclar os dados.")
             return pd.DataFrame(columns=expected_bling_cols_for_merge)
 
         df_bling['sku'] = df_bling['sku'].astype(str).str.strip()
@@ -283,7 +281,6 @@ def carregar_dados_bling_csv():
             df_bling['titulo_bling'] = df_bling['titulo_bling'].astype(
                 str).str.strip().fillna('')
 
-        # ALTERADO: 'tipo_de_venda' agora é tratado como as outras colunas de texto
         for col_to_fill in ['Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']:
             if col_to_fill not in df_bling.columns:
                 df_bling[col_to_fill] = pd.NA
@@ -291,12 +288,12 @@ def carregar_dados_bling_csv():
                 df_bling[col_to_fill] = df_bling[col_to_fill].astype(
                     str).str.strip().fillna(pd.NA)
 
-        print("✅ Dados de produtos do Bling carregados e pré-processados com sucesso.")
+        print("✅ Dados de produtos do CSV carregados e pré-processados com sucesso.")
         return df_bling[expected_bling_cols_for_merge]
 
     except FileNotFoundError:
         print(
             f"❌ ERRO: O arquivo '{config.ARQUIVO_BLING_PRODUTOS_CSV}' não foi encontrado.")
     except Exception as e:
-        print(f"❌ ERRO ao carregar dados do Bling CSV: {e}")
+        print(f"❌ ERRO ao carregar dados do CSV: {e}")
     return pd.DataFrame(columns=expected_bling_cols_for_merge)

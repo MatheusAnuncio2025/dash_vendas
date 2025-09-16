@@ -27,13 +27,16 @@ SCOPES = "98309 98314 5990556 6631498 318257570 318257583 333936575 363953167 36
 # --- 2. CONFIGURAÇÕES DA PLANILHA GOOGLE SHEETS ---
 URL_PLANILHA_GOOGLE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQA4DJVtDoKL2ypaInsieOXgU234SXRk8HXnAD0vkA9u8m7Jm9gaKyYkzy7O08IuFza8_VIEoRcwqTT/pub?gid=273712958&single=true&output=csv"
 
-# ALTERADO: Adicionado 'Tipo de Venda' ao mapeamento
+# Mapeamento para os dados da planilha
 MAPEAMENTO_GOOGLE_SHEETS = {
    'Codigo': 'sku',
+   'Produto': 'Produto',
+   'Quantidade': 'Quantidade',
+   'Valor unitario': 'Valor unitario',
    'Fornecedores': 'Fornecedores',
    'Categoria': 'Categoria',
    'Subcategoria': 'Subcategoria',
-   'Tipo de Venda': 'tipo_de_venda' 
+   'Tipo de Venda': 'tipo_de_venda'
 }
 
 # --- 3. GERENCIAMENTO DE REQUISIÇÕES E TOKENS ---
@@ -160,7 +163,7 @@ def fetch_all_products_from_bling(access_token):
                    "Produto": product.get("nome", ""),
                    "UN": "UN",
                    "Quantidade": product.get("estoque", {}).get("saldoVirtualTotal", 0),
-                   "Valor Unitario": f"{product.get('precoCusto', 0.0):.2f}".replace('.', ',')
+                   "Valor unitario": f"{product.get('precoCusto', 0.0):.2f}".replace('.', ',')
                })
            page += 1
            time.sleep(2)
@@ -174,7 +177,47 @@ def fetch_all_products_from_bling(access_token):
        print("⚠️ Nenhum produto foi encontrado no Bling.")
        return pd.DataFrame()
        
-   return pd.DataFrame(all_products_data)
+   df_bling = pd.DataFrame(all_products_data)
+   # Após buscar do Bling, enriquecemos com a planilha
+   return enrich_with_google_sheets(df_bling)
+
+
+def fetch_products_from_google_sheets():
+    """Busca e processa dados de produtos diretamente da planilha Google Sheets."""
+    print("\n📥 Buscando dados de produtos diretamente da planilha Google Sheets...")
+    try:
+        response = requests.get(URL_PLANILHA_GOOGLE_CSV, verify=False, timeout=30)
+        response.raise_for_status()
+        
+        df_gs = pd.read_csv(io.StringIO(response.content.decode('utf-8-sig')), header=0)
+        print("✅ Planilha Google lida com sucesso.")
+
+        # Renomeia as colunas para o padrão do script
+        df_gs = df_gs.rename(columns=MAPEAMENTO_GOOGLE_SHEETS)
+
+        if 'sku' not in df_gs.columns:
+            print("❌ ERRO CRÍTICO: A coluna 'Codigo' (renomeada para 'sku') não foi encontrada na planilha.")
+            return pd.DataFrame()
+
+        # Adiciona a coluna 'UN' que existia na saída do Bling
+        df_gs['UN'] = 'UN'
+
+        # Garante que as colunas esperadas existam
+        required_cols = ['sku', 'Produto', 'UN', 'Quantidade', 'Valor unitario', 'Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']
+        for col in required_cols:
+            if col not in df_gs.columns:
+                df_gs[col] = ''
+                print(f"⚠️ Coluna '{col}' não encontrada na planilha e criada como vazia.")
+
+        return df_gs[required_cols]
+
+    except requests.exceptions.RequestException as e:
+        print(f"❌ ERRO ao acessar Google Sheets: {e}. Verifique o link e se a planilha está publicada na web.")
+    except Exception as e:
+        print(f"❌ ERRO inesperado ao processar a planilha Google Sheets: {e}")
+    
+    return pd.DataFrame()
+
 
 def enrich_with_google_sheets(df_bling_products):
     """Busca dados da Planilha Google e os mescla com o DataFrame de produtos do Bling."""
@@ -187,28 +230,26 @@ def enrich_with_google_sheets(df_bling_products):
         df_gs = pd.read_csv(io.StringIO(response.content.decode('utf-8-sig')), header=0)
         print("✅ Planilha Google lida com sucesso.")
 
-        df_gs = df_gs.rename(columns=MAPEAMENTO_GOOGLE_SHEETS)
+        # Renomeia apenas as colunas de enriquecimento
+        df_gs = df_gs.rename(columns={
+            'Codigo': 'sku', 'Fornecedores': 'Fornecedores', 'Categoria': 'Categoria', 
+            'Subcategoria': 'Subcategoria', 'Tipo de Venda': 'tipo_de_venda'
+        })
 
         if 'sku' not in df_gs.columns:
-            print("❌ ERRO CRÍTICO: A coluna 'Codigo' não foi encontrada no cabeçalho da sua planilha Google. O enriquecimento será pulado.")
+            print("❌ ERRO CRÍTICO: A coluna 'Codigo' não foi encontrada na sua planilha Google. O enriquecimento será pulado.")
             return df_bling_products
 
-        # ALTERADO: Lista de colunas a serem processadas agora inclui 'tipo_de_venda'
         cols_from_gs_for_merge = []
         for col in ['sku', 'Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']:
             if col in df_gs.columns:
                 df_gs[col] = df_gs[col].astype(str).str.strip().fillna('')
                 cols_from_gs_for_merge.append(col)
-            else:
-                print(f"⚠️ Aviso: Coluna '{col}' não encontrada na planilha. Será criada vazia.")
-                # Adiciona a coluna vazia ao DataFrame do Bling para manter a estrutura
-                df_bling_products[col] = ''
         
         df_gs = df_gs.drop_duplicates(subset=['sku'], keep='last')
         
         df_merged = pd.merge(df_bling_products, df_gs[cols_from_gs_for_merge], on='sku', how='left')
 
-        # ALTERADO: Garante que a nova coluna também seja preenchida se não houver correspondência
         for col in ['Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']:
             if col in df_merged.columns:
                 df_merged[col] = df_merged[col].fillna('')
@@ -216,13 +257,10 @@ def enrich_with_google_sheets(df_bling_products):
         print("✅ Dados de fornecedores, categorias e tipo de venda incorporados com sucesso.")
         return df_merged
 
-    except requests.exceptions.RequestException as e:
-        print(f"❌ ERRO ao acessar Google Sheets: {e}. Verifique o link e se a planilha está publicada na web.")
     except Exception as e:
-        print(f"❌ ERRO inesperado ao processar a planilha Google Sheets: {e}")
+        print(f"❌ ERRO ao processar a planilha Google Sheets para enriquecimento: {e}")
     
     print("⚠️ Não foi possível enriquecer os dados. Prosseguindo apenas com dados do Bling.")
-    # ALTERADO: Garante que todas as colunas de enriquecimento existam no DF final
     for col in ['Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']:
         if col not in df_bling_products.columns:
             df_bling_products[col] = ''
@@ -239,11 +277,9 @@ def generate_csv_report(df_final, filename="relatorio_bling_otimizado.csv"):
 
    df_final = df_final.rename(columns={'sku': 'Código'})
    
-   # ALTERADO: Adicionado 'Tipo de Venda' aos cabeçalhos do CSV
-   fieldnames = ["Código", "Produto", "UN", "Quantidade", "Valor Unitario",
+   fieldnames = ["Código", "Produto", "UN", "Quantidade", "Valor unitario",
                  "Fornecedores", "Categoria", "Subcategoria", "Tipo de Venda"]
    
-   # Renomeia a coluna interna 'tipo_de_venda' para 'Tipo de Venda' para a saída
    if 'tipo_de_venda' in df_final.columns:
        df_final = df_final.rename(columns={'tipo_de_venda': 'Tipo de Venda'})
    
@@ -262,18 +298,22 @@ def generate_csv_report(df_final, filename="relatorio_bling_otimizado.csv"):
 # --- 6. FLUXO PRINCIPAL ---
 def main():
    print("Iniciando automação Bling...")
-   access_token = get_valid_access_token()
    
-   if access_token:
-       df_products = fetch_all_products_from_bling(access_token)
-       
-       if not df_products.empty:
-           df_enriched = enrich_with_google_sheets(df_products)
-           generate_csv_report(df_enriched)
-       else:
-           print("⚠️ Processo encerrado pois nenhum produto foi retornado pelo Bling.")
+   # ★★★ ESCOLHA A FONTE DE DADOS AQUI ★★★
+   
+   # --- OPÇÃO 1: Usar a API do Bling (descomente as 3 linhas abaixo) ---
+   # print("Modo API Bling ATIVADO.")
+   # access_token = get_valid_access_token()
+   # df_products = fetch_all_products_from_bling(access_token) if access_token else pd.DataFrame()
+
+   # --- OPÇÃO 2: Usar a Planilha Google Sheets (deixe como está) ---
+   print("Modo Planilha Google ATIVADO.")
+   df_products = fetch_products_from_google_sheets()
+
+   if not df_products.empty:
+       generate_csv_report(df_products)
    else:
-       print("❌ Não foi possível obter um access_token válido. Encerrando.")
+       print("⚠️ Processo encerrado pois nenhum produto foi retornado pela fonte de dados selecionada.")
    
    print(f"\nTotal de requisições à API Bling nesta execução: {REQUEST_COUNT}")
 
