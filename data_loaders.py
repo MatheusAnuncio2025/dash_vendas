@@ -251,7 +251,7 @@ def carregar_dados_bling_csv():
         df_bling = df_bling.rename(columns={
             'Código': 'sku',
             'Quantidade': 'Estq',
-            'Valor Unitario': 'custo_unitario',
+            'Valor unitario': 'custo_unitario',
             'Produto': 'titulo_bling',
             'Fornecedor': 'Fornecedores', # Mantido para compatibilidade, caso o CSV tenha esse nome
             'Tipo de Venda': 'tipo_de_venda'
