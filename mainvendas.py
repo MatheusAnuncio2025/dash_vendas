@@ -73,7 +73,7 @@ if __name__ == "__main__":
         all_possible_cols = list(dict.fromkeys(
             list(config.MAPEAMENTO_EXCEL_BIGQUERY.values()) +
             list(config.MAPEAMENTO_MAGIS5_BIGQUERY.values()) +
-            ['Estq', 'Categoria', 'Subcategoria', 'Fornecedores', 'custo_unitario', 
+            ['Estq', 'Categoria', 'Subcategoria', 'Fornecedores', 'custo_unitario',
              'cashback_cupom', 'Comissão', 'origem_dados', 'hora_do_pedido', 'tipo_de_venda']
         ))
 
@@ -116,28 +116,23 @@ if __name__ == "__main__":
                 list(config.MAPEAMENTO_EXCEL_BIGQUERY.keys()),
                 config.MAPEAMENTO_EXCEL_BIGQUERY
             )
-            
+
             ontem = hoje - timedelta(days=1)
             api_data_inicio = ontem
             print(f"   - O Excel foi carregado. A API buscará os dados a partir de ontem ({ontem.strftime('%d/%m/%Y')}).")
 
             if not df_excel_mes_vigente.empty:
                 linhas_originais = len(df_excel_mes_vigente)
-                
-                # ★★★ INÍCIO DA ALTERAÇÃO (TRATAMENTO PRÉVIO) ★★★
-                # 1. Garante que a coluna é do tipo string para evitar erros de conversão
+
                 df_excel_mes_vigente['data_do_pedido'] = df_excel_mes_vigente['data_do_pedido'].astype(str)
-                # 2. Converte para data usando o formato EXATO do Excel e extrai apenas a data (sem a hora)
                 df_excel_mes_vigente['data_do_pedido'] = pd.to_datetime(
-                    df_excel_mes_vigente['data_do_pedido'], 
-                    format='%d/%m/%Y %H:%M:%S', 
+                    df_excel_mes_vigente['data_do_pedido'],
+                    format='%d/%m/%Y %H:%M:%S',
                     errors='coerce'
                 ).dt.date
-                # ★★★ FIM DA ALTERAÇÃO ★★★
 
-                # 3. Aplica o filtro original
                 df_excel_mes_vigente = df_excel_mes_vigente[df_excel_mes_vigente['data_do_pedido'] < api_data_inicio]
-                
+
                 linhas_filtradas = len(df_excel_mes_vigente)
                 print(f"   - Filtrando Excel: Removidas {linhas_originais - linhas_filtradas} linhas de dias que serão atualizados pela API.")
 
@@ -170,14 +165,14 @@ if __name__ == "__main__":
         print("\n🔄 Combinando DataFrames de vendas de todos os períodos...")
         if not df_vendas_excel_prev_months.empty or not df_vendas_current_month_source.empty:
             df_vendas = pd.concat([df_vendas_excel_prev_months, df_vendas_current_month_source], ignore_index=True)
-            print(f"✅ DataFrames de todos os períodos combinados. Total de linhas final: {len(df_vendas)}")
+            print(f"✅ DataFrames de todos os períodos combinados. Total de linhas inicial: {len(df_vendas)}")
         else:
             print("❌ Nenhum dado de vendas (Excel ou Magis5) foi carregado. Encerrando o script.")
             time.sleep(20)
             sys.exit(1)
 
         # --- FIM DA LÓGICA DE CARREGAMENTO ---
-        
+
         df_vendas = data_transformers.pre_processar_dataframe(df_vendas)
 
         print("\n🔗 Carregando e mesclando dados de custo, estoque, fornecedores e categorias do Bling...")
@@ -190,7 +185,7 @@ if __name__ == "__main__":
             how='left',
             suffixes=('_orig', '_bling')
         )
-        
+
         for col_name in ['custo_unitario', 'Estq', 'titulo', 'Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']:
             bling_col = f"{col_name}_bling" if col_name != 'titulo' else 'titulo_bling'
             orig_col = f"{col_name}_orig" if col_name != 'titulo' else 'titulo'
@@ -234,6 +229,28 @@ if __name__ == "__main__":
             config.ARQUIVOS_SHOPEE_ZIP,
             df_vendas
         )
+
+        # ★★★ INÍCIO DA CORREÇÃO ★★★
+        # A etapa de deduplicação foi movida para depois de todos os merges e transformações,
+        # para garantir que estamos comparando dados já limpos e padronizados.
+        print("\n🛡️ Aplicando verificação final de duplicatas antes do upload...")
+        linhas_antes_dedup_final = len(df_vendas)
+        colunas_chave = ['numero_pedido', 'sku']
+        if all(col in df_vendas.columns for col in colunas_chave):
+            # Assegura que as colunas chave são do tipo string para uma comparação consistente
+            for col in colunas_chave:
+                df_vendas[col] = df_vendas[col].astype(str).str.strip()
+                
+            df_vendas = df_vendas.drop_duplicates(subset=colunas_chave, keep='last')
+            linhas_depois_dedup_final = len(df_vendas)
+            removidas = linhas_antes_dedup_final - linhas_depois_dedup_final
+            if removidas > 0:
+                print(f"✅ Deduplicação final concluída. {removidas} linhas duplicadas foram removidas.")
+            else:
+                print("✅ Nenhuma duplicata encontrada na verificação final.")
+        else:
+            print("⚠️ Colunas para deduplicação ('numero_pedido', 'sku') não encontradas. Pulando esta etapa.")
+        # ★★★ FIM DA CORREÇÃO ★★★
 
         print("🛠️ Reforçando tipos e preenchimento para colunas finais...")
         if 'Estq' in df_vendas.columns:
@@ -285,7 +302,7 @@ if __name__ == "__main__":
                         df_vendas[col_schema] = pd.NaT
                     else:
                         df_vendas[col_schema] = ''
-        
+
         df_vendas = df_vendas[colunas_finais_bigquery]
 
         output_handlers.fazer_upload_bigquery(

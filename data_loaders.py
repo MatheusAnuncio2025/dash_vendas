@@ -119,8 +119,6 @@ def carregar_vendas_magis5_api(api_url, api_key, page_size, mapping_cols, data_i
     page = 1
     total_pages = None
 
-    # ALTERADO: A lógica para definir o período padrão foi ajustada.
-    # Agora, se as datas não forem fornecidas, a busca será para hoje e ontem.
     if data_inicio is None or data_fim is None:
         hoje = datetime.now().date()
         ontem = hoje - timedelta(days=1)
@@ -148,7 +146,6 @@ def carregar_vendas_magis5_api(api_url, api_key, page_size, mapping_cols, data_i
 
         print(f"🌐 Solicitando página {page} da API Magis5...")
         try:
-            # CORREÇÃO: Removido 'verify=False' para garantir a verificação do certificado SSL.
             response = requests.get(url, headers=headers)
             response.raise_for_status()
 
@@ -228,7 +225,6 @@ def carregar_dados_bling_csv():
     print(
         f"\n🔗 Carregando dados de produtos do arquivo CSV: '{config.ARQUIVO_BLING_PRODUTOS_CSV}'...")
 
-    # Colunas esperadas do CSV gerado a partir da planilha
     expected_bling_cols_for_merge = ['sku', 'custo_unitario', 'Estq',
                                      'titulo_bling', 'Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']
 
@@ -247,19 +243,39 @@ def carregar_dados_bling_csv():
             decimal=','
         )
 
-        # Mapeamento para o merge, baseado nos nomes das colunas do CSV
         df_bling = df_bling.rename(columns={
             'Código': 'sku',
             'Quantidade': 'Estq',
             'Valor unitario': 'custo_unitario',
             'Produto': 'titulo_bling',
-            'Fornecedor': 'Fornecedores', # Mantido para compatibilidade, caso o CSV tenha esse nome
+            'Fornecedor': 'Fornecedores',
             'Tipo de Venda': 'tipo_de_venda'
         })
 
         if 'sku' not in df_bling.columns:
             print("⚠️ Coluna 'sku' não encontrada no CSV após renomeio. Não será possível mesclar os dados.")
             return pd.DataFrame(columns=expected_bling_cols_for_merge)
+
+        # ★★★ INÍCIO DA CORREÇÃO COM PRIORIZAÇÃO ★★★
+        # 1. Garante que a coluna de custo é numérica para podermos ordená-la
+        if 'custo_unitario' in df_bling.columns:
+            df_bling['custo_unitario'] = pd.to_numeric(
+                df_bling['custo_unitario'].astype(str).str.replace(',', '.'), errors='coerce'
+            ).fillna(0)
+        else:
+            df_bling['custo_unitario'] = 0.0
+
+        # 2. Ordena os dados para priorizar custos maiores que zero
+        # Para cada SKU, as linhas com custos maiores virão primeiro.
+        df_bling = df_bling.sort_values(by=['sku', 'custo_unitario'], ascending=[True, False])
+
+        # 3. Remove as duplicatas, mantendo a primeira linha de cada SKU (que agora é a de maior custo)
+        linhas_antes = len(df_bling)
+        df_bling = df_bling.drop_duplicates(subset=['sku'], keep='first')
+        linhas_depois = len(df_bling)
+        if linhas_antes != linhas_depois:
+            print(f"   - Alerta: {linhas_antes - linhas_depois} SKUs duplicados foram removidos da planilha de produtos, priorizando aqueles com custo preenchido.")
+        # ★★★ FIM DA CORREÇÃO COM PRIORIZAÇÃO ★★★
 
         df_bling['sku'] = df_bling['sku'].astype(str).str.strip()
 
@@ -269,6 +285,7 @@ def carregar_dados_bling_csv():
         else:
             df_bling['Estq'] = 0
 
+        # A coluna já foi convertida para numérica, agora aplicamos a conversão para Decimal seguro
         if 'custo_unitario' in df_bling.columns:
             df_bling['custo_unitario'] = df_bling['custo_unitario'].apply(
                 lambda x: to_decimal_safe(x, '0.000'))
