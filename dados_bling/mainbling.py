@@ -209,6 +209,14 @@ def fetch_products_from_google_sheets():
                 df_gs[col] = ''
                 print(f"⚠️ Coluna '{col}' não encontrada na planilha e criada como vazia.")
 
+        # ★★★ INÍCIO DA CORREÇÃO ★★★
+        # Assegura que a coluna 'Quantidade' seja numérica, tratando erros e valores ausentes.
+        # Isso garante que o estoque seja processado corretamente, mesmo que a coluna venha
+        # como texto ou com valores vazios da planilha.
+        if 'Quantidade' in df_gs.columns:
+            df_gs['Quantidade'] = pd.to_numeric(df_gs['Quantidade'], errors='coerce').fillna(0).astype(int)
+        # ★★★ FIM DA CORREÇÃO ★★★
+
         return df_gs[required_cols]
 
     except requests.exceptions.RequestException as e:

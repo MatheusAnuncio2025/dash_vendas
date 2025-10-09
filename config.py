@@ -84,7 +84,7 @@ ESQUEMA_BIGQUERY = [
     bigquery.SchemaField("status", "STRING"),
     bigquery.SchemaField("tipo_logistica", "STRING"),
     bigquery.SchemaField("custo_unitario", "NUMERIC"),
-    bigquery.SchemaField("cashback_cupom", "NUMERIC"),
+    bigquery.SchemaField("custo_total_produto", "NUMERIC"),
     bigquery.SchemaField("Comissão", "NUMERIC"),
     bigquery.SchemaField("Fornecedores", "STRING"),
     bigquery.SchemaField("Estq", "INTEGER"),
