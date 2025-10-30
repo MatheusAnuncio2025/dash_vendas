@@ -37,8 +37,8 @@ def add_missing_columns(df, all_cols_schema):
 
 if __name__ == "__main__":
     try:
-        # ★★★ NOVO: Linha de verificação adicionada aqui ★★★
-        print("\n--- [VERIFICAÇÃO KAREN] INICIANDO EXECUÇÃO DA VERSÃO ATUALIZADA DO mainvendas.py ---")
+        # ★★★ NOVO: Linha de verificação atualizada ★★★
+        print("\n--- [VERIFICAÇÃO KAREN] INICIANDO EXECUÇÃO DA VERSÃO OTIMIZADA BQ (mainvendas.py) ---")
 
         # 0. Initial Setup and Authentication
         data_loaders.autenticar_gcp()
@@ -63,6 +63,19 @@ if __name__ == "__main__":
         hoje = now.date()
         current_month_num = now.month
         current_year = now.year
+        
+        # ★★★ NOVO: LÓGICA DE DECISÃO DE CARGA ★★★
+        dia_do_mes = now.day
+        is_full_load = (dia_do_mes == 1)
+
+        if is_full_load:
+            print("\n*** 🚀 MODO DE CARGA: COMPLETA (WRITE_TRUNCATE) ***")
+            print("   (Primeiro dia do mês: A base inteira será substituída)")
+        else:
+            print("\n*** 🔄 MODO DE CARGA: MÊS VIGENTE (DELETE + APPEND) ***")
+            print("   (Apenas os dados do mês vigente serão atualizados no BigQuery)")
+        # ★★★ FIM DA LÓGICA DE DECISÃO ★★★
+
         month_name_map_pt = {
             1: 'janeiro', 2: 'fevereiro', 3: 'marco', 4: 'abril',
             5: 'maio', 6: 'junho', 7: 'julho', 8: 'agosto',
@@ -79,27 +92,34 @@ if __name__ == "__main__":
 
         # --- LÓGICA DE CARREGAMENTO DE DADOS ---
 
-        # 1. Carrega dados de meses anteriores (sempre do Excel)
-        print(f"\n📥 Verificando arquivos Excel na pasta '{config.PASTA_RELATORIOS_VENDAS}' para meses anteriores...")
-        excel_files_to_load = []
-        if os.path.exists(config.PASTA_RELATORIOS_VENDAS):
-            for filename in os.listdir(config.PASTA_RELATORIOS_VENDAS):
-                if filename.endswith('.xlsx') or filename.endswith('.xls'):
-                    file_base_name = os.path.splitext(filename)[0].lower()
-                    if file_base_name != current_month_name_pt and not file_base_name.endswith('_processado'):
-                        excel_files_to_load.append(os.path.join(config.PASTA_RELATORIOS_VENDAS, filename))
+        # 1. Carrega dados de meses anteriores (APENAS SE for full_load)
+        df_vendas_excel_prev_months = pd.DataFrame() # Inicializa vazio
+        
+        # ★★★ NOVO: Condição IF ★★★
+        if is_full_load:
+            print(f"\n📥 Verificando arquivos Excel na pasta '{config.PASTA_RELATORIOS_VENDAS}' para meses anteriores...")
+            excel_files_to_load = []
+            if os.path.exists(config.PASTA_RELATORIOS_VENDAS):
+                for filename in os.listdir(config.PASTA_RELATORIOS_VENDAS):
+                    if filename.endswith('.xlsx') or filename.endswith('.xls'):
+                        file_base_name = os.path.splitext(filename)[0].lower()
+                        if file_base_name != current_month_name_pt and not file_base_name.endswith('_processado'):
+                            excel_files_to_load.append(os.path.join(config.PASTA_RELATORIOS_VENDAS, filename))
 
-        df_vendas_excel_prev_months = pd.DataFrame()
-        if excel_files_to_load:
-            df_vendas_excel_prev_months = data_loaders.carregar_multiplos_excel_de_pasta(
-                excel_files_to_load,
-                list(config.MAPEAMENTO_EXCEL_BIGQUERY.keys()),
-                config.MAPEAMENTO_EXCEL_BIGQUERY
-            )
-            df_vendas_excel_prev_months = add_missing_columns(df_vendas_excel_prev_months, all_possible_cols)
-            print(f"✅ Arquivos Excel de meses anteriores consolidados. Total de linhas: {len(df_vendas_excel_prev_months)}")
+            if excel_files_to_load:
+                df_vendas_excel_prev_months = data_loaders.carregar_multiplos_excel_de_pasta(
+                    excel_files_to_load,
+                    list(config.MAPEAMENTO_EXCEL_BIGQUERY.keys()),
+                    config.MAPEAMENTO_EXCEL_BIGQUERY
+                )
+                df_vendas_excel_prev_months = add_missing_columns(df_vendas_excel_prev_months, all_possible_cols)
+                print(f"✅ Arquivos Excel de meses anteriores consolidados. Total de linhas: {len(df_vendas_excel_prev_months)}")
+            else:
+                print("\n⚠️ Nenhum arquivo Excel de meses anteriores encontrado para carregar.")
+        # ★★★ NOVO: Bloco ELSE ★★★
         else:
-            print("\n⚠️ Nenhum arquivo Excel de meses anteriores encontrado para carregar.")
+            print("\n☑️ Pulando carregamento de meses anteriores (não é o primeiro dia do mês).")
+
 
         # 2. Carrega dados do mês vigente (Excel + API)
         print(f"\n🔄 Processando dados para o mês vigente ({current_month_name_pt.capitalize()}/{current_year})...")
@@ -163,6 +183,7 @@ if __name__ == "__main__":
 
         # 3. Combinação final dos DataFrames
         print("\n🔄 Combinando DataFrames de vendas de todos os períodos...")
+        # (Esta lógica funciona, pois df_vendas_excel_prev_months estará vazio se não for full_load)
         if not df_vendas_excel_prev_months.empty or not df_vendas_current_month_source.empty:
             df_vendas = pd.concat([df_vendas_excel_prev_months, df_vendas_current_month_source], ignore_index=True)
             print(f"✅ DataFrames de todos os períodos combinados. Total de linhas inicial: {len(df_vendas)}")
@@ -305,15 +326,39 @@ if __name__ == "__main__":
 
         df_vendas = df_vendas[colunas_finais_bigquery]
 
-        output_handlers.fazer_upload_bigquery(
-            df_vendas,
-            config.ID_PROJETO,
-            config.ID_DATASET,
-            config.ID_TABELA,
-            config.ESQUEMA_BIGQUERY
-        )
+        # ★★★ NOVO: LÓGICA DE UPLOAD CONDICIONAL ★★★
+        if is_full_load:
+            print("\nExecutando upload completo (TRUNCATE)...")
+            output_handlers.fazer_upload_completo_bigquery( # Função renomeada
+                df_vendas,
+                config.ID_PROJETO,
+                config.ID_DATASET,
+                config.ID_TABELA,
+                config.ESQUEMA_BIGQUERY
+            )
+        else:
+            print("\nExecutando atualização do mês vigente (DELETE + APPEND)...")
+            # Se não for full_load, df_vendas contém *apenas* os dados do mês vigente.
+            # Se a df_vendas estiver vazia (nenhuma venda no mês), o DELETE 
+            # será executado, mas o APPEND não enviará nada, o que está correto.
+            output_handlers.atualizar_mes_vigente_bigquery( # Nova função
+                df_vendas,
+                config.ID_PROJETO,
+                config.ID_DATASET,
+                config.ID_TABELA,
+                config.ESQUEMA_BIGQUERY,
+                current_month_num,
+                current_year
+            )
+        # ★★★ FIM DA LÓGICA DE UPLOAD ★★★
 
         print("\n📊 Executando a Análise de Pareto em memória...")
+        # (O Pareto agora é executado com base nos dados que acabaram de ser processados:
+        # - Dia 1: Pareto sobre a base inteira
+        # - Outros dias: Pareto apenas sobre o mês vigente
+        # Se você quiser que o Pareto seja *sempre* da base inteira,
+        # teríamos que alterar o mainpareto.py para ler do BQ, mas por enquanto
+        # esta lógica de "Pareto em memória" está mantida.)
         pareto_analyzer.analisar_pareto_por_loja(df_vendas.copy())
 
 
