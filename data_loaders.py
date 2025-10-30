@@ -256,8 +256,8 @@ def carregar_dados_bling_csv():
             print("⚠️ Coluna 'sku' não encontrada no CSV após renomeio. Não será possível mesclar os dados.")
             return pd.DataFrame(columns=expected_bling_cols_for_merge)
 
-        # ★★★ INÍCIO DA CORREÇÃO COM PRIORIZAÇÃO ★★★
-        # 1. Garante que a coluna de custo é numérica para podermos ordená-la
+        # ★★★ INÍCIO DA CORREÇÃO 2: LÓGICA DE AGREGAÇÃO PARA SKU DUPLICADO ★★★
+        # 1. Garante que as colunas a serem agregadas sejam numéricas
         if 'custo_unitario' in df_bling.columns:
             df_bling['custo_unitario'] = pd.to_numeric(
                 df_bling['custo_unitario'].astype(str).str.replace(',', '.'), errors='coerce'
@@ -265,32 +265,37 @@ def carregar_dados_bling_csv():
         else:
             df_bling['custo_unitario'] = 0.0
 
-        # 2. Ordena os dados para priorizar custos maiores que zero
-        # Para cada SKU, as linhas com custos maiores virão primeiro.
-        df_bling = df_bling.sort_values(by=['sku', 'custo_unitario'], ascending=[True, False])
-
-        # 3. Remove as duplicatas, mantendo a primeira linha de cada SKU (que agora é a de maior custo)
-        linhas_antes = len(df_bling)
-        df_bling = df_bling.drop_duplicates(subset=['sku'], keep='first')
-        linhas_depois = len(df_bling)
-        if linhas_antes != linhas_depois:
-            print(f"   - Alerta: {linhas_antes - linhas_depois} SKUs duplicados foram removidos da planilha de produtos, priorizando aqueles com custo preenchido.")
-        # ★★★ FIM DA CORREÇÃO COM PRIORIZAÇÃO ★★★
-
-        df_bling['sku'] = df_bling['sku'].astype(str).str.strip()
-
         if 'Estq' in df_bling.columns:
             df_bling['Estq'] = pd.to_numeric(
                 df_bling['Estq'], errors='coerce').fillna(0).astype(int)
         else:
             df_bling['Estq'] = 0
 
-        # A coluna já foi convertida para numérica, agora aplicamos a conversão para Decimal seguro
-        if 'custo_unitario' in df_bling.columns:
-            df_bling['custo_unitario'] = df_bling['custo_unitario'].apply(
-                lambda x: to_decimal_safe(x, '0.000'))
-        else:
-            df_bling['custo_unitario'] = decimal.Decimal('0.000')
+        # 2. Agrupa por SKU e aplica as agregações
+        linhas_antes = len(df_bling)
+        # Cria um dicionário de agregações dinâmico com base nas colunas existentes
+        agg_dict = {
+            'custo_unitario': 'max', # Pega o maior custo para o SKU
+            'Estq': 'sum'            # Soma o estoque de todas as entradas do SKU
+        }
+        # Adiciona outras colunas para pegar o primeiro valor não nulo, se existirem
+        for col in ['titulo_bling', 'Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']:
+            if col in df_bling.columns:
+                agg_dict[col] = 'first'
+
+        df_bling_agg = df_bling.groupby('sku').agg(agg_dict).reset_index()
+        df_bling = df_bling_agg
+        
+        linhas_depois = len(df_bling)
+        if linhas_antes > linhas_depois:
+            print(f"   - Alerta: {linhas_antes - linhas_depois} SKUs duplicados foram agregados da planilha de produtos.")
+        # ★★★ FIM DA CORREÇÃO 2 ★★★
+
+        df_bling['sku'] = df_bling['sku'].astype(str).str.strip()
+
+        # A conversão para Decimal é feita aqui, após a agregação
+        df_bling['custo_unitario'] = df_bling['custo_unitario'].apply(
+            lambda x: to_decimal_safe(x, '0.000'))
 
         if 'titulo_bling' not in df_bling.columns:
             df_bling['titulo_bling'] = ''

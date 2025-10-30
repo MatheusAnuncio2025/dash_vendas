@@ -73,7 +73,7 @@ if __name__ == "__main__":
         all_possible_cols = list(dict.fromkeys(
             list(config.MAPEAMENTO_EXCEL_BIGQUERY.values()) +
             list(config.MAPEAMENTO_MAGIS5_BIGQUERY.values()) +
-            ['Estq', 'Categoria', 'Subcategoria', 'Fornecedores', 'custo_unitario',
+            ['Estq', 'Categoria', 'Subcategoria', 'Fornecedores', 'custo_unitario', 'custo_total_produto',
              'cashback_cupom', 'Comissão', 'origem_dados', 'hora_do_pedido', 'tipo_de_venda']
         ))
 
@@ -206,6 +206,14 @@ if __name__ == "__main__":
 
         print("✅ Dados do Bling mesclados com sucesso.")
 
+        # ★★★ CÁLCULO DO CUSTO TOTAL ★★★
+        print("💰 Calculando 'custo_total_produto'...")
+        df_vendas['quantidade'] = pd.to_numeric(df_vendas['quantidade'], errors='coerce').fillna(0)
+        df_vendas['custo_unitario'] = df_vendas['custo_unitario'].apply(data_loaders.to_decimal_safe)
+        df_vendas['custo_total_produto'] = (df_vendas['quantidade'] * df_vendas['custo_unitario']).apply(lambda x: decimal.Decimal(str(round(x, 3))))
+        print("✅ 'custo_total_produto' calculado com sucesso.")
+        # ★★★ FIM DO CÁLCULO ★★★
+
         if not df_vendas_current_month_source.empty:
             df_current_month_processed = df_vendas[
                 (pd.to_datetime(df_vendas['data_do_pedido']).dt.month == current_month_num) &
@@ -230,14 +238,10 @@ if __name__ == "__main__":
             df_vendas
         )
 
-        # ★★★ INÍCIO DA CORREÇÃO ★★★
-        # A etapa de deduplicação foi movida para depois de todos os merges e transformações,
-        # para garantir que estamos comparando dados já limpos e padronizados.
         print("\n🛡️ Aplicando verificação final de duplicatas antes do upload...")
         linhas_antes_dedup_final = len(df_vendas)
         colunas_chave = ['numero_pedido', 'sku']
         if all(col in df_vendas.columns for col in colunas_chave):
-            # Assegura que as colunas chave são do tipo string para uma comparação consistente
             for col in colunas_chave:
                 df_vendas[col] = df_vendas[col].astype(str).str.strip()
                 
@@ -250,7 +254,6 @@ if __name__ == "__main__":
                 print("✅ Nenhuma duplicata encontrada na verificação final.")
         else:
             print("⚠️ Colunas para deduplicação ('numero_pedido', 'sku') não encontradas. Pulando esta etapa.")
-        # ★★★ FIM DA CORREÇÃO ★★★
 
         print("🛠️ Reforçando tipos e preenchimento para colunas finais...")
         if 'Estq' in df_vendas.columns:
@@ -269,7 +272,7 @@ if __name__ == "__main__":
             df_vendas = df_vendas.loc[:,~df_vendas.columns.duplicated(keep='last')]
 
         print("🛠️ Ajustando tipos de dados para o upload no BigQuery...")
-        monetary_cols_to_convert = ['valor_total_produto', 'cashback_cupom', 'Comissão', 'custo_unitario']
+        monetary_cols_to_convert = ['valor_total_produto', 'custo_total_produto', 'cashback_cupom', 'Comissão', 'custo_unitario']
         for col in monetary_cols_to_convert:
             if col in df_vendas.columns:
                 df_vendas[col] = df_vendas[col].apply(data_loaders.to_decimal_safe)
@@ -286,9 +289,6 @@ if __name__ == "__main__":
 
         print("⬆️ Preparando para upload no BigQuery...")
         colunas_finais_bigquery = [field.name for field in config.ESQUEMA_BIGQUERY]
-
-        if 'custo_total_produto' in df_vendas.columns:
-            df_vendas = df_vendas.drop(columns=['custo_total_produto'], errors='ignore')
 
         for col_schema in colunas_finais_bigquery:
             if col_schema not in df_vendas.columns:

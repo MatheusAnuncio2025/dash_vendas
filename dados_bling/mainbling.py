@@ -9,14 +9,21 @@ import pandas as pd
 from decimal import Decimal, getcontext
 import io
 import unicodedata
+import sys
+
+# ★★★ INÍCIO DA CORREÇÃO ★★★
+# Adiciona o diretório pai ao path para permitir a importação do config.py
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import config
+# ★★★ FIM DA CORREÇÃO ★★★
 
 # --- 1. CONFIGURAÇÕES GERAIS DO BLING ---
 CLIENT_ID = "eeefd981ec1f89e66a40847fc5157a9105cda608"
 CLIENT_SECRET = "4268ade685394eed2608e1219371f99062aa60a8c5d017388b5b1ab58256"
 REDIRECT_URI = "http://localhost:8080/"
 
-OUTPUT_DIRECTORY = "C:\\Users\\grupo\\OneDrive\\Documentos\\VS Code\\Relatorio_vendas\\dados_bling"
-TOKEN_FILE = os.path.join(OUTPUT_DIRECTORY, "bling_tokens.json")
+# ★★★ CORREÇÃO: O caminho do arquivo de tokens agora é relativo ao arquivo de dados do Bling do config
+TOKEN_FILE = os.path.join(os.path.dirname(config.ARQUIVO_BLING_PRODUTOS_CSV), "bling_tokens.json")
 
 OAUTH_AUTH_URL = "https://www.bling.com.br/b/OAuth2/views/authorization.php"
 OAUTH_TOKEN_URL = "https://www.bling.com.br/Api/v3/oauth/token"
@@ -60,7 +67,8 @@ def load_tokens():
 
 def save_tokens(tokens):
    """Salva os tokens em um arquivo JSON."""
-   os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
+   # ★★★ CORREÇÃO: Garante que o diretório de destino (do config) exista
+   os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
    with open(TOKEN_FILE, 'w') as f:
        json.dump(tokens, f, indent=4)
    print(f"Tokens salvos em '{TOKEN_FILE}'.")
@@ -209,13 +217,8 @@ def fetch_products_from_google_sheets():
                 df_gs[col] = ''
                 print(f"⚠️ Coluna '{col}' não encontrada na planilha e criada como vazia.")
 
-        # ★★★ INÍCIO DA CORREÇÃO ★★★
-        # Assegura que a coluna 'Quantidade' seja numérica, tratando erros e valores ausentes.
-        # Isso garante que o estoque seja processado corretamente, mesmo que a coluna venha
-        # como texto ou com valores vazios da planilha.
         if 'Quantidade' in df_gs.columns:
             df_gs['Quantidade'] = pd.to_numeric(df_gs['Quantidade'], errors='coerce').fillna(0).astype(int)
-        # ★★★ FIM DA CORREÇÃO ★★★
 
         return df_gs[required_cols]
 
@@ -275,9 +278,10 @@ def enrich_with_google_sheets(df_bling_products):
     return df_bling_products
 
 # --- 5. GERAÇÃO DO CSV FINAL ---
-def generate_csv_report(df_final, filename="relatorio_bling_otimizado.csv"):
+def generate_csv_report(df_final):
    """Gera o arquivo CSV final a partir do DataFrame processado."""
-   csv_full_path = os.path.join(OUTPUT_DIRECTORY, filename)
+   # ★★★ CORREÇÃO: O caminho do arquivo agora vem do config global
+   csv_full_path = config.ARQUIVO_BLING_PRODUTOS_CSV
 
    if df_final.empty:
        print("Nenhum dado para gerar o relatório CSV.")
@@ -296,7 +300,9 @@ def generate_csv_report(df_final, filename="relatorio_bling_otimizado.csv"):
            df_final[col] = ''
 
    try:
-       os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
+       # ★★★ CORREÇÃO: Garante que o diretório de destino (do config) exista
+       output_dir = os.path.dirname(csv_full_path)
+       os.makedirs(output_dir, exist_ok=True)
        df_final.to_csv(csv_full_path, columns=fieldnames, sep=';', index=False, encoding='utf-8-sig')
        print(f"\n✅ Relatório CSV '{csv_full_path}' gerado com sucesso!")
        print(f"Total de produtos no relatório: {len(df_final)}")
