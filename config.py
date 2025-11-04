@@ -1,3 +1,4 @@
+# matheusanuncio2025/dash_vendas/dash_vendas-6d3feb241c1a3fb70df9019d9f8c29be5f0ce6fd/config.py
 import pandas as pd
 from google.cloud import bigquery
 import os
@@ -34,15 +35,16 @@ ARQUIVOS_SHOPEE_ZIP = [
 
 PASTA_RELATORIOS_VENDAS = resolve_path('Relatorio_vendas' + os.sep) # Adicionado os.sep para garantir que seja uma pasta
 
+# ★★★ ATUALIZADO ★★★
 # Detalhes do Projeto Google Cloud
-ID_PROJETO = 'skilful-firefly-434016-b2'
-ID_DATASET = 'relatorio_vendas'
-ID_TABELA = 'base_dash_relatorio_vendas'
-# O nome do arquivo JSON deve corresponder ao que você está incluindo no build.bat
-ARQUIVO_CONTA_SERVICO = resolve_path("skilful-firefly-434016-b2-364eae284f30.json") 
+ID_PROJETO = 'projeto-dashvendas' # ATENÇÃO: Confirme se este é o ID do seu novo projeto.
+ID_DATASET = 'relatorio_vendas' # Nome do conjunto de dados principal.
+ID_TABELA = 'base_dash_relatorio_vendas' # Nome da tabela principal.
+# ATUALIZADO com o nome da sua nova chave:
+ARQUIVO_CONTA_SERVICO = resolve_path("projeto-dashvendas-9121a04b5446.json") 
 
-# Detalhes para as tabelas de Pareto no BigQuery
-ID_DATASET_PARETO = 'relatorio_pareto'
+# ATUALIZADO com o novo nome do dataset Pareto:
+ID_DATASET_PARETO = 'pareto_lojas' 
 ID_TABELA_PARETO_PREFIXO = 'pareto'
 
 # NOVO: Detalhes para a tabela de Projeção de Vendas no BigQuery

@@ -1,10 +1,13 @@
+# matheusanuncio2025/dash_vendas/dash_vendas-6d3feb241c1a3fb70df9019d9f8c29be5f0ce6fd/setup.py
 import sys
 from cx_Freeze import setup, Executable
 
+# ★★★ ATUALIZADO ★★★
 # Lista de arquivos e pastas para incluir no executável
 # DEIXAMOS APENAS O ARQUIVO DE CHAVE, QUE É FIXO.
 include_files = [
-    ('skilful-firefly-434016-b2-364eae284f30.json', 'skilful-firefly-434016-b2-364eae284f30.json')
+    # ATUALIZADO com o nome da sua nova chave:
+    ('projeto-dashvendas-9121a04b5446.json', 'projeto-dashvendas-9121a04b5446.json')
 ]
 
 # Lista de pacotes que o cx_Freeze pode não encontrar sozinho
