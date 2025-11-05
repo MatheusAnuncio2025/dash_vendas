@@ -32,10 +32,13 @@ def _calcular_pareto(df, col_valor, prefixo_curva):
     df_sorted[f'curva_{prefixo_curva}'] = df_sorted[f'pareto_{prefixo_curva}'].apply(classificar_curva)
     return df_sorted
 
-def analisar_pareto_por_loja(df_vendas_original):
+# ★★★ CORREÇÃO AQUI: Adicionado 'is_full_load' ★★★
+def analisar_pareto_por_loja(df_vendas_original, is_full_load):
     """
     Realiza a análise de Pareto por loja e por mês para quantidade e GMV,
     e faz o upload dos resultados para o BigQuery em tabelas separadas POR LOJA.
+    
+    Aplica a lógica de TRUNCATE (se is_full_load=True) ou DELETE+APPEND (se is_full_load=False).
     """
     print("\n📊 Iniciando análise de Pareto por loja e por mês...")
 
@@ -187,18 +190,73 @@ def analisar_pareto_por_loja(df_vendas_original):
 
         id_tabela_pareto = f"{config.ID_TABELA_PARETO_PREFIXO}_{nome_tabela_formatado}"
 
-        # Faz upload para o BigQuery
-        print(f"🚀 Enviando {len(df_final_para_upload)} linhas para BigQuery → Tabela: `{config.ID_PROJETO}.{config.ID_DATASET_PARETO}.{id_tabela_pareto}`...")
-        try:
-            pandas_gbq.to_gbq(
-                df_final_para_upload,
-                destination_table=f"{config.ID_DATASET_PARETO}.{id_tabela_pareto}",
-                project_id=config.ID_PROJETO,
-                if_exists='replace',
-                table_schema=schema_for_pandas_gbq
-            )
-            print(f"✅ Upload da análise de Pareto para a tabela `{id_tabela_pareto}` finalizado!")
-        except Exception as e:
-            print(f"❌ ERRO ao fazer upload da análise de Pareto para '{loja_nome_ou_filtro}' para BigQuery: {e}")
+        # ★★★ INÍCIO DA LÓGICA DE UPLOAD CORRIGIDA ★★★
+        destination_table_id = f"{config.ID_PROJETO}.{config.ID_DATASET_PARETO}.{id_tabela_pareto}"
+
+        if is_full_load:
+            # --- MODO: CARGA COMPLETA (TRUNCATE) ---
+            print(f"🚀 [CARGA COMPLETA] Enviando {len(df_final_para_upload)} linhas para BigQuery (TRUNCATE) → Tabela: `{destination_table_id}`...")
+            try:
+                pandas_gbq.to_gbq(
+                    df_final_para_upload,
+                    destination_table=f"{config.ID_DATASET_PARETO}.{id_tabela_pareto}",
+                    project_id=config.ID_PROJETO,
+                    if_exists='replace', # Sobrescreve a tabela
+                    table_schema=schema_for_pandas_gbq
+                )
+                print(f"✅ Upload COMPLETO da análise de Pareto para a tabela `{id_tabela_pareto}` finalizado!")
+            except Exception as e:
+                print(f"❌ ERRO ao fazer upload completo (TRUNCATE) da análise de Pareto para '{loja_nome_ou_filtro}': {e}")
+        
+        else:
+            # --- MODO: ATUALIZAÇÃO DO MÊS VIGENTE (DELETE + APPEND) ---
+            print(f"🔄 [ATUALIZAÇÃO MÊS] Enviando {len(df_final_para_upload)} linhas para BigQuery (APPEND) → Tabela: `{destination_table_id}`...")
+            
+            # Pega os meses de referência que estão sendo processados (ex: ['11/novembro/2025'])
+            meses_para_deletar = df_final_para_upload['mes_referencia'].unique().tolist()
+            
+            if not meses_para_deletar:
+                print("⚠️ Nenhum mês de referência encontrado nos dados de Pareto. Abortando upload.")
+                continue
+
+            client = bigquery.Client(project=config.ID_PROJETO)
+            
+            # 1. Executar o DELETE
+            # Formata a lista de meses para a cláusula IN
+            meses_formatados_sql = ", ".join([f"'{mes}'" for mes in meses_para_deletar])
+            
+            query_delete = f"""
+            DELETE FROM `{destination_table_id}`
+            WHERE mes_referencia IN ({meses_formatados_sql})
+            """
+            
+            print(f"   - Executando DELETE para os meses: {meses_para_deletar}...")
+            try:
+                query_job = client.query(query_delete)
+                query_job.result() # Espera o DELETE completar
+                print(f"   - Registros dos meses {meses_para_deletar} deletados com sucesso da tabela `{id_tabela_pareto}`.")
+            except Exception as e:
+                # Verifica se o erro é 'tabela não encontrada' (para o caso de ser a primeira execução do mês)
+                if "Not found" in str(e):
+                    print(f"   - A tabela `{id_tabela_pareto}` pode não existir ainda. Tentando criar com o APPEND...")
+                else:
+                    print(f"❌ ERRO ao executar o DELETE na tabela de Pareto `{id_tabela_pareto}`: {e}")
+                    print("   - O upload (APPEND) será abortado.")
+                    continue # Pula para a próxima loja
+
+            # 2. Executar o APPEND
+            print(f"   - Iniciando APPEND dos dados de Pareto ({len(df_final_para_upload)} linhas)...")
+            try:
+                pandas_gbq.to_gbq(
+                    df_final_para_upload,
+                    destination_table=f"{config.ID_DATASET_PARETO}.{id_tabela_pareto}",
+                    project_id=config.ID_PROJETO,
+                    if_exists='append', # Adiciona os novos dados
+                    table_schema=schema_for_pandas_gbq
+                )
+                print(f"✅ Upload (APPEND) da análise de Pareto para a tabela `{id_tabela_pareto}` finalizado!")
+            except Exception as e:
+                print(f"❌ ERRO ao fazer upload (APPEND) da análise de Pareto para '{loja_nome_ou_filtro}': {e}")
+        # ★★★ FIM DA LÓGICA DE UPLOAD CORRIGIDA ★★★
 
     print("\n✅ Análise de Pareto concluída para todas as lojas/consolidações e uploads para BigQuery finalizados.")

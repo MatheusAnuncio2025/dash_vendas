@@ -66,7 +66,7 @@ if __name__ == "__main__":
         
         # ★★★ NOVO: LÓGICA DE DECISÃO DE CARGA ★★★
         dia_do_mes = now.day
-        is_full_load = (dia_do_mes == 1)
+        is_full_load = True # (dia_do_mes == 1)
 
         if is_full_load:
             print("\n*** 🚀 MODO DE CARGA: COMPLETA (WRITE_TRUNCATE) ***")
@@ -359,7 +359,11 @@ if __name__ == "__main__":
         # Se você quiser que o Pareto seja *sempre* da base inteira,
         # teríamos que alterar o mainpareto.py para ler do BQ, mas por enquanto
         # esta lógica de "Pareto em memória" está mantida.)
-        pareto_analyzer.analisar_pareto_por_loja(df_vendas.copy())
+        
+        # ★★★ CORREÇÃO AQUI ★★★
+        # Passa o flag 'is_full_load' para a função de análise
+        pareto_analyzer.analisar_pareto_por_loja(df_vendas.copy(), is_full_load)
+        # ★★★ FIM DA CORREÇÃO ★★★
 
 
         print("\n✅ Processamento completo concluído com sucesso!")
