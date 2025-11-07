@@ -122,23 +122,26 @@ ESQUEMA_BIGQUERY_PROJECAO = [
 
 # Mapeamento para padronizar nomes de lojas
 PADRONIZACAO_NOMES_LOJAS = {
-    'Mercado Livre - MEGAJU': 'Mercado Livre - Megaju',
-    'Mercado Livre - JULISHOP': 'Mercado Livre - Julishop',
-    'Shopee - NANU SHOP': 'Shopee - Nanu Shop',
-    'Shopee - Loja_da_mada': 'Shopee - Loja da Mada',
-    'Mercado Livre -  LOJA_THITI': 'Mercado Livre - Loja Thiti',
-    'Mercado Livre - LOJA_THITI': 'Mercado Livre - Loja Thiti',
-    'Kabum - JULISHOP': 'Kabum - Julishop',
-    'Magazine Luiza - Shop Midas': 'Magazine Luiza - Shop Midas',
     'Amazon - Daril Vendas': 'Amazon - Daril Vendas',
     'Amazon - LOJA DA MADA': 'Amazon - Loja Da Mada',
-    'Shopify - Shopify': 'Shopify - Shopify',
-    'Ali Express - NANU.SHOP': 'AliExpress - Nanu Shop',
-    'TikTok - NANU SHOP': 'TikTok - Nanu Shop',
+    'Amazon - LOJA THITI': 'Amazon - Loja Thiti',
+    'Amazon - MEGAJU': 'Amazon - Megaju',
     'Amazon - MEGA STAR SHOPP': 'Amazon - Mega Star Shop',
-    'Shopee - Daril Vendas': 'Shopee - Daril Vendas',
     'Amazon - NANU SHOP': 'Amazon - Nanu Shop',
-    'Amazon - LOJA THITI': 'Amazon - Loja Thiti'
+    'Ali Express - LOJA THITI': 'AliExpress - Loja Thiti',
+    'Ali Express - NANU.SHOP': 'AliExpress - Nanu Shop',
+    'Kabum - JULISHOP': 'Kabum - Julishop',
+    'Mercado Livre - JULISHOP': 'Mercado Livre - Julishop',
+    'Mercado Livre -  LOJA_THITI': 'Mercado Livre - Loja Thiti',
+    'Mercado Livre - LOJA_THITI': 'Mercado Livre - Loja Thiti',
+    'Mercado Livre - MEGAJU': 'Mercado Livre - Megaju',
+    'Shopee - NANU SHOP': 'Shopee - Nanu Shop',
+    'Shopee - Loja_da_mada': 'Shopee - Loja da Mada',
+    'Shopee - Daril Vendas': 'Shopee - Daril Vendas',
+    'TikTok - NANU SHOP': 'TikTok - Nanu Shop',
+    'TikTok - LOJA DA MADA': 'TikTok - Loja da Mada',
+    'Magazine Luiza - Shop Midas': 'Magazine Luiza - Shop Midas',
+    'Shopify - Shopify': 'Shopify - Shopify',
 }
 
 # --- Configurações da API Magis5 ---
