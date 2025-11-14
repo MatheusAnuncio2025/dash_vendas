@@ -23,9 +23,9 @@ def resolve_path(relative_path):
 
 # Caminhos de Arquivo (AGORA RESOLVIDOS DINAMICAMENTE PARA O EXECUTÁVEL)
 # O executável irá procurar por esses arquivos e pastas no mesmo diretório onde ele está.
-ARQUIVO_SAIDA_MD = resolve_path('base_dash_relatorio_vendas.md')
+ARQUIVO_SAIDA_MD = resolve_path('base_dash_relatorio_vendas2.md')
 ARQUIVO_BLING_PRODUTOS_CSV = resolve_path(os.path.join('dados_bling', 'relatorio_bling_otimizado.csv'))
-ARQUIVO_HISTORICO_VENDAS_MD = resolve_path('base_dash_relatorio_vendas.md') # Se for o mesmo arquivo de saída
+ARQUIVO_HISTORICO_VENDAS_MD = resolve_path('base_dash_relatorio_vendas2.md') # Se for o mesmo arquivo de saída
 
 ARQUIVOS_SHOPEE_ZIP = [
     resolve_path(os.path.join('Relatorio Canais', 'shopee_nanu.zip')),
@@ -37,18 +37,18 @@ PASTA_RELATORIOS_VENDAS = resolve_path('Relatorio_vendas' + os.sep) # Adicionado
 
 # ★★★ ATUALIZADO ★★★
 # Detalhes do Projeto Google Cloud
-ID_PROJETO = 'projeto-dashvendas' # ATENÇÃO: Confirme se este é o ID do seu novo projeto.
-ID_DATASET = 'relatorio_vendas' # Nome do conjunto de dados principal.
-ID_TABELA = 'base_dash_relatorio_vendas' # Nome da tabela principal.
+ID_PROJETO = 'projeto-dashvendas2' # ATENÇÃO: Confirme se este é o ID do seu novo projeto.
+ID_DATASET = 'relatorio_vendas2' # Nome do conjunto de dados principal.
+ID_TABELA = 'base_dash_relatorio_vendas2' # Nome da tabela principal.
 # ATUALIZADO com o nome da sua nova chave:
-ARQUIVO_CONTA_SERVICO = resolve_path("projeto-dashvendas-9121a04b5446.json") 
+ARQUIVO_CONTA_SERVICO = resolve_path("projeto-dashvendas2-4d78607a18d2.json") 
 
 # ATUALIZADO com o novo nome do dataset Pareto:
 ID_DATASET_PARETO = 'pareto_lojas' 
 ID_TABELA_PARETO_PREFIXO = 'pareto'
 
 # NOVO: Detalhes para a tabela de Projeção de Vendas no BigQuery
-ID_DATASET_PROJECAO = 'relatorio_vendas' # Pode ser o mesmo dataset de vendas ou um novo
+ID_DATASET_PROJECAO = 'relatorio_vendas2' # Pode ser o mesmo dataset de vendas ou um novo
 ID_TABELA_PROJECAO_VENDAS = 'projecoes_vendas_ia'
 
 # Mapeamento de Colunas do Excel para o padrão do BigQuery

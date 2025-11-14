@@ -7,7 +7,7 @@ from cx_Freeze import setup, Executable
 # DEIXAMOS APENAS O ARQUIVO DE CHAVE, QUE É FIXO.
 include_files = [
     # ATUALIZADO com o nome da sua nova chave:
-    ('projeto-dashvendas-9121a04b5446.json', 'projeto-dashvendas-9121a04b5446.json')
+    ('projeto-dashvendas2-4d78607a18d2.json', 'projeto-dashvendas2-4d78607a18d2.json')
 ]
 
 # Lista de pacotes que o cx_Freeze pode não encontrar sozinho
