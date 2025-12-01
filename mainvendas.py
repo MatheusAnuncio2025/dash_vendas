@@ -13,6 +13,7 @@ import output_handlers
 import pareto_analyzer
 from dados_bling import mainbling
 
+
 def add_missing_columns(df, all_cols_schema):
     """
     Adds missing columns to a DataFrame based on a schema with appropriate default values.
@@ -37,8 +38,8 @@ def add_missing_columns(df, all_cols_schema):
 
 if __name__ == "__main__":
     try:
-        # ★★★ NOVO: Linha de verificação atualizada ★★★
-        print("\n--- [VERIFICAÇÃO KAREN] INICIANDO EXECUÇÃO DA VERSÃO OTIMIZADA BQ (mainvendas.py) ---")
+        print(
+            "\n--- [VERIFICAÇÃO] INICIANDO EXECUÇÃO DA VERSÃO OTIMIZADA BQ (mainvendas.py) ---")
 
         # 0. Initial Setup and Authentication
         data_loaders.autenticar_gcp()
@@ -47,11 +48,11 @@ if __name__ == "__main__":
         # Garante que as pastas de saída existam
         os.makedirs(config.PASTA_RELATORIOS_VENDAS, exist_ok=True)
         if os.path.dirname(config.ARQUIVO_BLING_PRODUTOS_CSV):
-             os.makedirs(os.path.dirname(config.ARQUIVO_BLING_PRODUTOS_CSV), exist_ok=True)
+            os.makedirs(os.path.dirname(
+                config.ARQUIVO_BLING_PRODUTOS_CSV), exist_ok=True)
         for zip_path in config.ARQUIVOS_SHOPEE_ZIP:
             if os.path.dirname(zip_path):
                 os.makedirs(os.path.dirname(zip_path), exist_ok=True)
-
 
         # Call Bling data update process
         print("\n--- Iniciando atualização dos dados do bling ---")
@@ -63,25 +64,20 @@ if __name__ == "__main__":
         hoje = now.date()
         current_month_num = now.month
         current_year = now.year
-        
-        # ★★★ NOVO: LÓGICA DE DECISÃO DE CARGA ★★★
-        dia_do_mes = now.day
-        is_full_load = True # (dia_do_mes == 1)
 
-        if is_full_load:
-            print("\n*** 🚀 MODO DE CARGA: COMPLETA (WRITE_TRUNCATE) ***")
-            print("   (Primeiro dia do mês: A base inteira será substituída)")
-        else:
-            print("\n*** 🔄 MODO DE CARGA: MÊS VIGENTE (DELETE + APPEND) ***")
-            print("   (Apenas os dados do mês vigente serão atualizados no BigQuery)")
-        # ★★★ FIM DA LÓGICA DE DECISÃO ★★★
+        # ★★★ SEMPRE USAR MODO TRUNCATE ★★★
+        dia_do_mes = now.day
+        # is_full_load = True # Sempre True para usar TRUNCATE
+        print("\n*** 🚀 MODO DE CARGA: COMPLETA (WRITE_TRUNCATE) ***")
+        print("   (A base inteira será substituída)")
 
         month_name_map_pt = {
             1: 'janeiro', 2: 'fevereiro', 3: 'marco', 4: 'abril',
             5: 'maio', 6: 'junho', 7: 'julho', 8: 'agosto',
             9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro'
         }
-        current_month_name_pt = month_name_map_pt.get(current_month_num, '').lower()
+        current_month_name_pt = month_name_map_pt.get(
+            current_month_num, '').lower()
 
         all_possible_cols = list(dict.fromkeys(
             list(config.MAPEAMENTO_EXCEL_BIGQUERY.values()) +
@@ -92,78 +88,125 @@ if __name__ == "__main__":
 
         # --- LÓGICA DE CARREGAMENTO DE DADOS ---
 
-        # 1. Carrega dados de meses anteriores (APENAS SE for full_load)
-        df_vendas_excel_prev_months = pd.DataFrame() # Inicializa vazio
-        
-        # ★★★ NOVO: Condição IF ★★★
-        if is_full_load:
-            print(f"\n📥 Verificando arquivos Excel na pasta '{config.PASTA_RELATORIOS_VENDAS}' para meses anteriores...")
-            excel_files_to_load = []
-            if os.path.exists(config.PASTA_RELATORIOS_VENDAS):
-                for filename in os.listdir(config.PASTA_RELATORIOS_VENDAS):
-                    if filename.endswith('.xlsx') or filename.endswith('.xls'):
-                        file_base_name = os.path.splitext(filename)[0].lower()
-                        if file_base_name != current_month_name_pt and not file_base_name.endswith('_processado'):
-                            excel_files_to_load.append(os.path.join(config.PASTA_RELATORIOS_VENDAS, filename))
+        # 1. Carrega dados de meses anteriores (SEMPRE, pois usamos TRUNCATE)
+        df_vendas_excel_prev_months = pd.DataFrame()
 
-            if excel_files_to_load:
-                df_vendas_excel_prev_months = data_loaders.carregar_multiplos_excel_de_pasta(
-                    excel_files_to_load,
-                    list(config.MAPEAMENTO_EXCEL_BIGQUERY.keys()),
-                    config.MAPEAMENTO_EXCEL_BIGQUERY
-                )
-                df_vendas_excel_prev_months = add_missing_columns(df_vendas_excel_prev_months, all_possible_cols)
-                print(f"✅ Arquivos Excel de meses anteriores consolidados. Total de linhas: {len(df_vendas_excel_prev_months)}")
-            else:
-                print("\n⚠️ Nenhum arquivo Excel de meses anteriores encontrado para carregar.")
-        # ★★★ NOVO: Bloco ELSE ★★★
-        else:
-            print("\n☑️ Pulando carregamento de meses anteriores (não é o primeiro dia do mês).")
+        print(
+            f"\n📥 Verificando arquivos Excel na pasta '{config.PASTA_RELATORIOS_VENDAS}' para meses anteriores...")
+        excel_files_to_load = []
+        if os.path.exists(config.PASTA_RELATORIOS_VENDAS):
+            for filename in os.listdir(config.PASTA_RELATORIOS_VENDAS):
+                if filename.endswith('.xlsx') or filename.endswith('.xls'):
+                    file_base_name = os.path.splitext(filename)[0].lower()
+                    if file_base_name != current_month_name_pt and not file_base_name.endswith('_processado'):
+                        excel_files_to_load.append(os.path.join(
+                            config.PASTA_RELATORIOS_VENDAS, filename))
 
-
-        # 2. Carrega dados do mês vigente (Excel + API)
-        print(f"\n🔄 Processando dados para o mês vigente ({current_month_name_pt.capitalize()}/{current_year})...")
-        dfs_mes_vigente = []
-        api_data_inicio = None
-        api_data_fim = hoje
-
-        current_month_excel_filepath = os.path.join(config.PASTA_RELATORIOS_VENDAS, f"{current_month_name_pt}.xlsx")
-
-        if os.path.exists(current_month_excel_filepath):
-            print(f"   - Arquivo Excel '{current_month_name_pt}.xlsx' encontrado. Carregando dados...")
-            df_excel_mes_vigente = data_loaders.carregar_multiplos_excel_de_pasta(
-                [current_month_excel_filepath],
+        if excel_files_to_load:
+            df_vendas_excel_prev_months = data_loaders.carregar_multiplos_excel_de_pasta(
+                excel_files_to_load,
                 list(config.MAPEAMENTO_EXCEL_BIGQUERY.keys()),
                 config.MAPEAMENTO_EXCEL_BIGQUERY
             )
+            df_vendas_excel_prev_months = add_missing_columns(
+                df_vendas_excel_prev_months, all_possible_cols)
+            print(
+                f"✅ Arquivos Excel de meses anteriores consolidados. Total de linhas: {len(df_vendas_excel_prev_months)}")
+        else:
+            print(
+                "\n⚠️ Nenhum arquivo Excel de meses anteriores encontrado para carregar.")
 
-            ontem = hoje - timedelta(days=1)
-            api_data_inicio = ontem
-            print(f"   - O Excel foi carregado. A API buscará os dados a partir de ontem ({ontem.strftime('%d/%m/%Y')}).")
+        # 2. Carrega dados do mês vigente (Excel + API)
+        print(
+            f"\n🔄 Processando dados para o mês vigente ({current_month_name_pt.capitalize()}/{current_year})...")
+        dfs_mes_vigente = []
 
-            if not df_excel_mes_vigente.empty:
-                linhas_originais = len(df_excel_mes_vigente)
+        current_month_excel_filepath = os.path.join(
+            config.PASTA_RELATORIOS_VENDAS, f"{current_month_name_pt}.xlsx")
 
-                df_excel_mes_vigente['data_do_pedido'] = df_excel_mes_vigente['data_do_pedido'].astype(str)
-                df_excel_mes_vigente['data_do_pedido'] = pd.to_datetime(
-                    df_excel_mes_vigente['data_do_pedido'],
-                    format='%d/%m/%Y %H:%M:%S',
-                    errors='coerce'
-                ).dt.date
+        # ★★★ LÓGICA CORRIGIDA PARA DIA 1 vs OUTROS DIAS ★★★
+        if dia_do_mes == 1:
+            # Primeiro dia do mês: API busca APENAS HOJE
+            print(f"   📅 Primeiro dia do mês detectado.")
+            api_data_inicio = hoje
+            api_data_fim = hoje
+            print(
+                f"   - A API buscará apenas os dados de HOJE ({hoje.strftime('%d/%m/%Y')}).")
 
-                df_excel_mes_vigente = df_excel_mes_vigente[df_excel_mes_vigente['data_do_pedido'] < api_data_inicio]
-
-                linhas_filtradas = len(df_excel_mes_vigente)
-                print(f"   - Filtrando Excel: Removidas {linhas_originais - linhas_filtradas} linhas de dias que serão atualizados pela API.")
-
-            df_excel_mes_vigente = add_missing_columns(df_excel_mes_vigente, all_possible_cols)
-            dfs_mes_vigente.append(df_excel_mes_vigente)
+            # Carrega o Excel do mês anterior (se existir) para adicionar ao consolidado
+            if os.path.exists(current_month_excel_filepath):
+                print(
+                    f"   - Arquivo Excel '{current_month_name_pt}.xlsx' encontrado (mês anterior).")
+                df_excel_mes_vigente = data_loaders.carregar_multiplos_excel_de_pasta(
+                    [current_month_excel_filepath],
+                    list(config.MAPEAMENTO_EXCEL_BIGQUERY.keys()),
+                    config.MAPEAMENTO_EXCEL_BIGQUERY
+                )
+                df_excel_mes_vigente = add_missing_columns(
+                    df_excel_mes_vigente, all_possible_cols)
+                dfs_mes_vigente.append(df_excel_mes_vigente)
+                print(
+                    f"   - Excel do mês anterior carregado: {len(df_excel_mes_vigente)} linhas.")
+            else:
+                print(
+                    f"   - Nenhum Excel do mês anterior encontrado (normal no início do primeiro mês).")
 
         else:
-            print(f"   - Arquivo Excel '{current_month_name_pt}.xlsx' NÃO encontrado.")
-            api_data_inicio = hoje.replace(day=1)
-            print(f"   - A API buscará os dados do início do mês até hoje ({api_data_inicio.strftime('%d/%m/%Y')} a {api_data_fim.strftime('%d/%m/%Y')}).")
+            # Qualquer outro dia: API busca ONTEM e HOJE
+            print(f"   📅 Dia {dia_do_mes} do mês detectado.")
 
+            if os.path.exists(current_month_excel_filepath):
+                print(
+                    f"   - Arquivo Excel '{current_month_name_pt}.xlsx' encontrado. Carregando dados...")
+                df_excel_mes_vigente = data_loaders.carregar_multiplos_excel_de_pasta(
+                    [current_month_excel_filepath],
+                    list(config.MAPEAMENTO_EXCEL_BIGQUERY.keys()),
+                    config.MAPEAMENTO_EXCEL_BIGQUERY
+                )
+
+                # Remove os dados de ONTEM e HOJE do Excel (serão atualizados pela API)
+                ontem = hoje - timedelta(days=1)
+                api_data_inicio = ontem
+                api_data_fim = hoje
+                print(
+                    f"   - A API buscará os dados de ONTEM e HOJE ({ontem.strftime('%d/%m/%Y')} a {hoje.strftime('%d/%m/%Y')}).")
+
+                if not df_excel_mes_vigente.empty:
+                    linhas_originais = len(df_excel_mes_vigente)
+
+                    df_excel_mes_vigente['data_do_pedido'] = df_excel_mes_vigente['data_do_pedido'].astype(
+                        str)
+                    df_excel_mes_vigente['data_do_pedido'] = pd.to_datetime(
+                        df_excel_mes_vigente['data_do_pedido'],
+                        format='%d/%m/%Y %H:%M:%S',
+                        errors='coerce'
+                    ).dt.date
+
+                    # Remove ONTEM e HOJE do Excel
+                    df_excel_mes_vigente = df_excel_mes_vigente[
+                        (df_excel_mes_vigente['data_do_pedido'] < ontem) |
+                        (df_excel_mes_vigente['data_do_pedido'] > hoje)
+                    ]
+
+                    linhas_filtradas = len(df_excel_mes_vigente)
+                    print(
+                        f"   - Filtrando Excel: Removidas {linhas_originais - linhas_filtradas} linhas de ONTEM e HOJE (serão atualizadas pela API).")
+
+                df_excel_mes_vigente = add_missing_columns(
+                    df_excel_mes_vigente, all_possible_cols)
+                dfs_mes_vigente.append(df_excel_mes_vigente)
+
+            else:
+                # Se não tem Excel, busca do dia 1 até hoje
+                print(
+                    f"   - Arquivo Excel '{current_month_name_pt}.xlsx' NÃO encontrado.")
+                api_data_inicio = hoje.replace(day=1)
+                api_data_fim = hoje
+                print(
+                    f"   - A API buscará os dados do início do mês até hoje ({api_data_inicio.strftime('%d/%m/%Y')} a {api_data_fim.strftime('%d/%m/%Y')}).")
+        # ★★★ FIM DA LÓGICA CORRIGIDA ★★★
+
+        # Busca da API (sempre executa)
         df_vendas_api = data_loaders.carregar_vendas_magis5_api(
             config.MAGIS5_API_URL, config.MAGIS5_API_KEY, config.MAGIS5_PAGE_SIZE,
             config.MAPEAMENTO_MAGIS5_BIGQUERY,
@@ -171,24 +214,29 @@ if __name__ == "__main__":
             data_fim=api_data_fim
         )
         if not df_vendas_api.empty:
-            df_vendas_api = add_missing_columns(df_vendas_api, all_possible_cols)
+            df_vendas_api = add_missing_columns(
+                df_vendas_api, all_possible_cols)
             dfs_mes_vigente.append(df_vendas_api)
 
         df_vendas_current_month_source = pd.DataFrame()
         if dfs_mes_vigente:
-            df_vendas_current_month_source = pd.concat(dfs_mes_vigente, ignore_index=True)
-            print(f"✅ Dados do mês vigente (Excel + API) consolidados. Total de linhas: {len(df_vendas_current_month_source)}")
+            df_vendas_current_month_source = pd.concat(
+                dfs_mes_vigente, ignore_index=True)
+            print(
+                f"✅ Dados do mês vigente (Excel + API) consolidados. Total de linhas: {len(df_vendas_current_month_source)}")
         else:
             print("⚠️ Nenhum dado do mês vigente (Excel ou API) foi carregado.")
 
         # 3. Combinação final dos DataFrames
         print("\n🔄 Combinando DataFrames de vendas de todos os períodos...")
-        # (Esta lógica funciona, pois df_vendas_excel_prev_months estará vazio se não for full_load)
         if not df_vendas_excel_prev_months.empty or not df_vendas_current_month_source.empty:
-            df_vendas = pd.concat([df_vendas_excel_prev_months, df_vendas_current_month_source], ignore_index=True)
-            print(f"✅ DataFrames de todos os períodos combinados. Total de linhas inicial: {len(df_vendas)}")
+            df_vendas = pd.concat(
+                [df_vendas_excel_prev_months, df_vendas_current_month_source], ignore_index=True)
+            print(
+                f"✅ DataFrames de todos os períodos combinados. Total de linhas inicial: {len(df_vendas)}")
         else:
-            print("❌ Nenhum dado de vendas (Excel ou Magis5) foi carregado. Encerrando o script.")
+            print(
+                "❌ Nenhum dado de vendas (Excel ou Magis5) foi carregado. Encerrando o script.")
             time.sleep(20)
             sys.exit(1)
 
@@ -201,7 +249,8 @@ if __name__ == "__main__":
 
         df_vendas = pd.merge(
             df_vendas,
-            df_bling_data[['sku', 'custo_unitario', 'Estq', 'titulo_bling', 'Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']],
+            df_bling_data[['sku', 'custo_unitario', 'Estq', 'titulo_bling',
+                           'Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']],
             on='sku',
             how='left',
             suffixes=('_orig', '_bling')
@@ -212,41 +261,57 @@ if __name__ == "__main__":
             orig_col = f"{col_name}_orig" if col_name != 'titulo' else 'titulo'
 
             if col_name == 'custo_unitario':
-                df_vendas['custo_unitario'] = df_vendas[bling_col].combine_first(df_vendas[orig_col]).apply(data_loaders.to_decimal_safe)
+                df_vendas['custo_unitario'] = df_vendas[bling_col].combine_first(
+                    df_vendas[orig_col]).apply(data_loaders.to_decimal_safe)
             elif col_name == 'Estq':
-                df_vendas['Estq'] = df_vendas[bling_col].combine_first(df_vendas[orig_col])
-                df_vendas['Estq'] = pd.to_numeric(df_vendas['Estq'], errors='coerce').fillna(0).astype(int)
+                df_vendas['Estq'] = df_vendas[bling_col].combine_first(
+                    df_vendas[orig_col])
+                df_vendas['Estq'] = pd.to_numeric(
+                    df_vendas['Estq'], errors='coerce').fillna(0).astype(int)
             elif col_name == 'titulo':
-                 df_vendas['titulo'] = df_vendas['titulo'].fillna(df_vendas[bling_col])
+                df_vendas['titulo'] = df_vendas['titulo'].fillna(
+                    df_vendas[bling_col])
             else:
-                df_vendas[col_name] = df_vendas[bling_col].combine_first(df_vendas[orig_col] if orig_col in df_vendas.columns else pd.Series(dtype=object))
-                df_vendas[col_name] = df_vendas[col_name].astype(str).str.strip().fillna('')
+                df_vendas[col_name] = df_vendas[bling_col].combine_first(
+                    df_vendas[orig_col] if orig_col in df_vendas.columns else pd.Series(dtype=object))
+                df_vendas[col_name] = df_vendas[col_name].astype(
+                    str).str.strip().fillna('')
 
-        cols_to_drop_after_bling_merge = [col for col in df_vendas.columns if col.endswith(('_orig', '_bling'))]
-        df_vendas = df_vendas.drop(columns=cols_to_drop_after_bling_merge, errors='ignore')
+        cols_to_drop_after_bling_merge = [
+            col for col in df_vendas.columns if col.endswith(('_orig', '_bling'))]
+        df_vendas = df_vendas.drop(
+            columns=cols_to_drop_after_bling_merge, errors='ignore')
 
         print("✅ Dados do Bling mesclados com sucesso.")
 
-        # ★★★ CÁLCULO DO CUSTO TOTAL ★★★
+        # Cálculo do custo total
         print("💰 Calculando 'custo_total_produto'...")
-        df_vendas['quantidade'] = pd.to_numeric(df_vendas['quantidade'], errors='coerce').fillna(0)
-        df_vendas['custo_unitario'] = df_vendas['custo_unitario'].apply(data_loaders.to_decimal_safe)
-        df_vendas['custo_total_produto'] = (df_vendas['quantidade'] * df_vendas['custo_unitario']).apply(lambda x: decimal.Decimal(str(round(x, 3))))
+        df_vendas['quantidade'] = pd.to_numeric(
+            df_vendas['quantidade'], errors='coerce').fillna(0)
+        df_vendas['custo_unitario'] = df_vendas['custo_unitario'].apply(
+            data_loaders.to_decimal_safe)
+        df_vendas['custo_total_produto'] = (
+            df_vendas['quantidade'] * df_vendas['custo_unitario']).apply(lambda x: decimal.Decimal(str(round(x, 3))))
         print("✅ 'custo_total_produto' calculado com sucesso.")
-        # ★★★ FIM DO CÁLCULO ★★★
 
         if not df_vendas_current_month_source.empty:
             df_current_month_processed = df_vendas[
                 (pd.to_datetime(df_vendas['data_do_pedido']).dt.month == current_month_num) &
-                (pd.to_datetime(df_vendas['data_do_pedido']).dt.year == current_year)
+                (pd.to_datetime(
+                    df_vendas['data_do_pedido']).dt.year == current_year)
             ].copy()
-            df_current_month_processed = df_current_month_processed.drop(columns=['origem_dados'], errors='ignore')
+            df_current_month_processed = df_current_month_processed.drop(
+                columns=['origem_dados'], errors='ignore')
             try:
-                output_path_current_month_excel = os.path.join(config.PASTA_RELATORIOS_VENDAS, f"{current_month_name_pt}_PROCESSADO.xlsx")
-                df_current_month_processed.to_excel(output_path_current_month_excel, index=False)
-                print(f"✅ Dados processados do mês vigente exportados para '{output_path_current_month_excel}'.")
+                output_path_current_month_excel = os.path.join(
+                    config.PASTA_RELATORIOS_VENDAS, f"{current_month_name_pt}_PROCESSADO.xlsx")
+                df_current_month_processed.to_excel(
+                    output_path_current_month_excel, index=False)
+                print(
+                    f"✅ Dados processados do mês vigente exportados para '{output_path_current_month_excel}'.")
             except Exception as e:
-                print(f"❌ ERRO ao exportar dados processados do mês vigente para Excel: {e}")
+                print(
+                    f"❌ ERRO ao exportar dados processados do mês vigente para Excel: {e}")
         else:
             print("⚠️ Nenhum dado do mês vigente processado para exportar para Excel.")
 
@@ -265,55 +330,67 @@ if __name__ == "__main__":
         if all(col in df_vendas.columns for col in colunas_chave):
             for col in colunas_chave:
                 df_vendas[col] = df_vendas[col].astype(str).str.strip()
-                
-            df_vendas = df_vendas.drop_duplicates(subset=colunas_chave, keep='last')
+
+            df_vendas = df_vendas.drop_duplicates(
+                subset=colunas_chave, keep='last')
             linhas_depois_dedup_final = len(df_vendas)
             removidas = linhas_antes_dedup_final - linhas_depois_dedup_final
             if removidas > 0:
-                print(f"✅ Deduplicação final concluída. {removidas} linhas duplicadas foram removidas.")
+                print(
+                    f"✅ Deduplicação final concluída. {removidas} linhas duplicadas foram removidas.")
             else:
                 print("✅ Nenhuma duplicata encontrada na verificação final.")
         else:
-            print("⚠️ Colunas para deduplicação ('numero_pedido', 'sku') não encontradas. Pulando esta etapa.")
+            print(
+                "⚠️ Colunas para deduplicação ('numero_pedido', 'sku') não encontradas. Pulando esta etapa.")
 
         print("🛠️ Reforçando tipos e preenchimento para colunas finais...")
         if 'Estq' in df_vendas.columns:
-            df_vendas['Estq'] = pd.to_numeric(df_vendas['Estq'], errors='coerce').fillna(0).astype(int)
+            df_vendas['Estq'] = pd.to_numeric(
+                df_vendas['Estq'], errors='coerce').fillna(0).astype(int)
         else:
             df_vendas['Estq'] = 0
 
         for col_str in ['Categoria', 'Subcategoria', 'Fornecedores', 'tipo_de_venda']:
             if col_str in df_vendas.columns:
-                df_vendas[col_str] = df_vendas[col_str].astype(str).str.strip().fillna('')
+                df_vendas[col_str] = df_vendas[col_str].astype(
+                    str).str.strip().fillna('')
             else:
                 df_vendas[col_str] = ''
 
         if df_vendas.columns.duplicated().any():
             print("⚠️ Aviso: Colunas duplicadas encontradas. Removendo duplicatas.")
-            df_vendas = df_vendas.loc[:,~df_vendas.columns.duplicated(keep='last')]
+            df_vendas = df_vendas.loc[:, ~
+                                      df_vendas.columns.duplicated(keep='last')]
 
         print("🛠️ Ajustando tipos de dados para o upload no BigQuery...")
-        monetary_cols_to_convert = ['valor_total_produto', 'custo_total_produto', 'cashback_cupom', 'Comissão', 'custo_unitario']
+        monetary_cols_to_convert = [
+            'valor_total_produto', 'custo_total_produto', 'cashback_cupom', 'Comissão', 'custo_unitario']
         for col in monetary_cols_to_convert:
             if col in df_vendas.columns:
-                df_vendas[col] = df_vendas[col].apply(data_loaders.to_decimal_safe)
+                df_vendas[col] = df_vendas[col].apply(
+                    data_loaders.to_decimal_safe)
             else:
                 df_vendas[col] = decimal.Decimal('0.000')
 
         if 'data_do_pedido' in df_vendas.columns:
-            df_vendas['data_do_pedido'] = pd.to_datetime(df_vendas['data_do_pedido'], errors='coerce').dt.date
+            df_vendas['data_do_pedido'] = pd.to_datetime(
+                df_vendas['data_do_pedido'], errors='coerce').dt.date
         else:
             df_vendas['data_do_pedido'] = pd.NaT
 
         print("📝 Gerando arquivo Markdown para o dashboard...")
-        output_handlers.gerar_saida_markdown(df_vendas, config.ARQUIVO_SAIDA_MD)
+        output_handlers.gerar_saida_markdown(
+            df_vendas, config.ARQUIVO_SAIDA_MD)
 
         print("⬆️ Preparando para upload no BigQuery...")
-        colunas_finais_bigquery = [field.name for field in config.ESQUEMA_BIGQUERY]
+        colunas_finais_bigquery = [
+            field.name for field in config.ESQUEMA_BIGQUERY]
 
         for col_schema in colunas_finais_bigquery:
             if col_schema not in df_vendas.columns:
-                schema_field = next((field for field in config.ESQUEMA_BIGQUERY if field.name == col_schema), None)
+                schema_field = next(
+                    (field for field in config.ESQUEMA_BIGQUERY if field.name == col_schema), None)
                 if schema_field:
                     if schema_field.field_type == "NUMERIC":
                         df_vendas[col_schema] = decimal.Decimal('0.000')
@@ -326,52 +403,27 @@ if __name__ == "__main__":
 
         df_vendas = df_vendas[colunas_finais_bigquery]
 
-        # ★★★ NOVO: LÓGICA DE UPLOAD CONDICIONAL ★★★
-        if is_full_load:
-            print("\nExecutando upload completo (TRUNCATE)...")
-            output_handlers.fazer_upload_completo_bigquery( # Função renomeada
-                df_vendas,
-                config.ID_PROJETO,
-                config.ID_DATASET,
-                config.ID_TABELA,
-                config.ESQUEMA_BIGQUERY
-            )
-        else:
-            print("\nExecutando atualização do mês vigente (DELETE + APPEND)...")
-            # Se não for full_load, df_vendas contém *apenas* os dados do mês vigente.
-            # Se a df_vendas estiver vazia (nenhuma venda no mês), o DELETE 
-            # será executado, mas o APPEND não enviará nada, o que está correto.
-            output_handlers.atualizar_mes_vigente_bigquery( # Nova função
-                df_vendas,
-                config.ID_PROJETO,
-                config.ID_DATASET,
-                config.ID_TABELA,
-                config.ESQUEMA_BIGQUERY,
-                current_month_num,
-                current_year
-            )
-        # ★★★ FIM DA LÓGICA DE UPLOAD ★★★
+        # ★★★ SEMPRE USAR TRUNCATE ★★★
+        print("\nExecutando upload completo (TRUNCATE)...")
+        output_handlers.fazer_upload_completo_bigquery(
+            df_vendas,
+            config.ID_PROJETO,
+            config.ID_DATASET,
+            config.ID_TABELA,
+            config.ESQUEMA_BIGQUERY
+        )
 
         print("\n📊 Executando a Análise de Pareto em memória...")
-        # (O Pareto agora é executado com base nos dados que acabaram de ser processados:
-        # - Dia 1: Pareto sobre a base inteira
-        # - Outros dias: Pareto apenas sobre o mês vigente
-        # Se você quiser que o Pareto seja *sempre* da base inteira,
-        # teríamos que alterar o mainpareto.py para ler do BQ, mas por enquanto
-        # esta lógica de "Pareto em memória" está mantida.)
-        
-        # ★★★ CORREÇÃO AQUI ★★★
-        # Passa o flag 'is_full_load' para a função de análise
-        pareto_analyzer.analisar_pareto_por_loja(df_vendas.copy(), is_full_load)
-        # ★★★ FIM DA CORREÇÃO ★★★
-
+        # Passa True para indicar que é sempre full load (base completa)
+        pareto_analyzer.analisar_pareto_por_loja(df_vendas.copy(), True)
 
         print("\n✅ Processamento completo concluído com sucesso!")
         print("Programa finalizado. A janela fechará em 20 segundos...")
         time.sleep(20)
 
     except FileNotFoundError as e:
-        print(f"❌ ERRO: Arquivo não encontrado: {e}. Verifique se a pasta '{config.PASTA_RELATORIOS_VENDAS}' e os arquivos ZIP necessários existem.")
+        print(
+            f"❌ ERRO: Arquivo não encontrado: {e}. Verifique se a pasta '{config.PASTA_RELATORIOS_VENDAS}' e os arquivos ZIP necessários existem.")
         time.sleep(20)
         sys.exit(1)
     except Exception as e:

@@ -137,6 +137,18 @@ def carregar_vendas_magis5_api(api_url, api_key, page_size, mapping_cols, data_i
     timestamp_from = int(start_of_period.timestamp())
     timestamp_to = int(end_of_period.timestamp())
 
+    # ★★★ LOGS DE DEBUG ADICIONADOS ★★★
+    print(f"   🕐 Parâmetros de busca da API:")
+    print(f"      - data_inicio: {data_inicio}")
+    print(f"      - data_fim: {data_fim}")
+    print(f"      - start_of_period: {start_of_period}")
+    print(f"      - end_of_period: {end_of_period}")
+    print(
+        f"      - timestamp_from: {timestamp_from} ({datetime.fromtimestamp(timestamp_from)})")
+    print(
+        f"      - timestamp_to: {timestamp_to} ({datetime.fromtimestamp(timestamp_to)})")
+    # ★★★ FIM DOS LOGS ★★★
+
     while True:
         url = (
             f"{api_url}?page={page}&limit={page_size}"
@@ -253,11 +265,11 @@ def carregar_dados_bling_csv():
         })
 
         if 'sku' not in df_bling.columns:
-            print("⚠️ Coluna 'sku' não encontrada no CSV após renomeio. Não será possível mesclar os dados.")
+            print(
+                "⚠️ Coluna 'sku' não encontrada no CSV após renomeio. Não será possível mesclar os dados.")
             return pd.DataFrame(columns=expected_bling_cols_for_merge)
 
-        # ★★★ INÍCIO DA CORREÇÃO 2: LÓGICA DE AGREGAÇÃO PARA SKU DUPLICADO ★★★
-        # 1. Garante que as colunas a serem agregadas sejam numéricas
+        # Lógica de agregação para SKU duplicado
         if 'custo_unitario' in df_bling.columns:
             df_bling['custo_unitario'] = pd.to_numeric(
                 df_bling['custo_unitario'].astype(str).str.replace(',', '.'), errors='coerce'
@@ -271,29 +283,28 @@ def carregar_dados_bling_csv():
         else:
             df_bling['Estq'] = 0
 
-        # 2. Agrupa por SKU e aplica as agregações
+        # Agrupa por SKU e aplica as agregações
         linhas_antes = len(df_bling)
-        # Cria um dicionário de agregações dinâmico com base nas colunas existentes
         agg_dict = {
-            'custo_unitario': 'max', # Pega o maior custo para o SKU
-            'Estq': 'sum'            # Soma o estoque de todas as entradas do SKU
+            'custo_unitario': 'max',  # Pega o maior custo para o SKU
+            'Estq': 'sum'             # Soma o estoque de todas as entradas do SKU
         }
-        # Adiciona outras colunas para pegar o primeiro valor não nulo, se existirem
+        # Adiciona outras colunas para pegar o primeiro valor não nulo
         for col in ['titulo_bling', 'Fornecedores', 'Categoria', 'Subcategoria', 'tipo_de_venda']:
             if col in df_bling.columns:
                 agg_dict[col] = 'first'
 
         df_bling_agg = df_bling.groupby('sku').agg(agg_dict).reset_index()
         df_bling = df_bling_agg
-        
+
         linhas_depois = len(df_bling)
         if linhas_antes > linhas_depois:
-            print(f"   - Alerta: {linhas_antes - linhas_depois} SKUs duplicados foram agregados da planilha de produtos.")
-        # ★★★ FIM DA CORREÇÃO 2 ★★★
+            print(
+                f"   ℹ️ {linhas_antes - linhas_depois} SKUs duplicados foram agregados da planilha de produtos.")
 
         df_bling['sku'] = df_bling['sku'].astype(str).str.strip()
 
-        # A conversão para Decimal é feita aqui, após a agregação
+        # Conversão para Decimal após a agregação
         df_bling['custo_unitario'] = df_bling['custo_unitario'].apply(
             lambda x: to_decimal_safe(x, '0.000'))
 
