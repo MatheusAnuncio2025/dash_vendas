@@ -92,12 +92,13 @@ if __name__ == "__main__":
         df_vendas_excel_prev_months = pd.DataFrame()
 
         print(
-            f"\n📥 Verificando arquivos Excel na pasta '{config.PASTA_RELATORIOS_VENDAS}' para meses anteriores...")
+            f"\n📥 Verificando arquivos Excel na pasta '{config.PASTA_RELATORIOS_VENDAS}' para meses ANTERIORES...")
         excel_files_to_load = []
         if os.path.exists(config.PASTA_RELATORIOS_VENDAS):
             for filename in os.listdir(config.PASTA_RELATORIOS_VENDAS):
                 if filename.endswith('.xlsx') or filename.endswith('.xls'):
                     file_base_name = os.path.splitext(filename)[0].lower()
+                    # Garante que não carregamos o arquivo do mês vigente nem o _PROCESSADO
                     if file_base_name != current_month_name_pt and not file_base_name.endswith('_processado'):
                         excel_files_to_load.append(os.path.join(
                             config.PASTA_RELATORIOS_VENDAS, filename))
@@ -111,14 +112,14 @@ if __name__ == "__main__":
             df_vendas_excel_prev_months = add_missing_columns(
                 df_vendas_excel_prev_months, all_possible_cols)
             print(
-                f"✅ Arquivos Excel de meses anteriores consolidados. Total de linhas: {len(df_vendas_excel_prev_months)}")
+                f"✅ Arquivos Excel de meses anteriores (passados) consolidados. Total de linhas: {len(df_vendas_excel_prev_months)}")
         else:
             print(
-                "\n⚠️ Nenhum arquivo Excel de meses anteriores encontrado para carregar.")
+                "\n⚠️ Nenhum arquivo Excel de meses anteriores (passados) encontrado para carregar.")
 
-        # 2. Carrega dados do mês vigente (Excel + API)
+        # 2. Carrega dados do mês vigente/anterior (Excel + API)
         print(
-            f"\n🔄 Processando dados para o mês vigente ({current_month_name_pt.capitalize()}/{current_year})...")
+            f"\n🔄 Processando dados para o mês vigente e o anterior (se for dia 1)...")
         dfs_mes_vigente = []
 
         current_month_excel_filepath = os.path.join(
@@ -126,33 +127,44 @@ if __name__ == "__main__":
 
         # ★★★ LÓGICA CORRIGIDA PARA DIA 1 vs OUTROS DIAS ★★★
         if dia_do_mes == 1:
-            # Primeiro dia do mês: API busca APENAS HOJE
+            # Primeiro dia do mês: Carrega o Excel do mês anterior (completo) e a API busca APENAS HOJE
             print(f"   📅 Primeiro dia do mês detectado.")
+
+            # --- 2.1. Carrega Excel do Mês Anterior (Fechado) ---
+            # Ex: Se hoje é 01/Dez, ontem é 30/Nov. Usamos o mês de Novembro.
+            ontem = hoje - timedelta(days=1)
+            mes_anterior_num = ontem.month
+            mes_anterior_name_pt = month_name_map_pt.get(
+                mes_anterior_num, '').lower()
+
+            excel_prev_month_filepath = os.path.join(
+                config.PASTA_RELATORIOS_VENDAS, f"{mes_anterior_name_pt}.xlsx")
+
+            if os.path.exists(excel_prev_month_filepath):
+                print(
+                    f"   - Arquivo Excel '{mes_anterior_name_pt}.xlsx' encontrado. Carregando dados completos (incluindo 28, 29, 30)...")
+                df_excel_mes_anterior = data_loaders.carregar_multiplos_excel_de_pasta(
+                    [excel_prev_month_filepath],
+                    list(config.MAPEAMENTO_EXCEL_BIGQUERY.keys()),
+                    config.MAPEAMENTO_EXCEL_BIGQUERY
+                )
+                df_excel_mes_anterior = add_missing_columns(
+                    df_excel_mes_anterior, all_possible_cols)
+                dfs_mes_vigente.append(df_excel_mes_anterior)
+                print(
+                    f"   - Excel do mês anterior carregado: {len(df_excel_mes_anterior)} linhas.")
+            else:
+                print(
+                    f"   - ⚠️ Nenhum Excel do mês anterior ('{mes_anterior_name_pt}.xlsx') encontrado. Apenas dados de HOJE serão carregados pela API.")
+
+            # --- 2.2. API busca APENAS HOJE (dia 1 do novo mês) ---
             api_data_inicio = hoje
             api_data_fim = hoje
             print(
                 f"   - A API buscará apenas os dados de HOJE ({hoje.strftime('%d/%m/%Y')}).")
 
-            # Carrega o Excel do mês anterior (se existir) para adicionar ao consolidado
-            if os.path.exists(current_month_excel_filepath):
-                print(
-                    f"   - Arquivo Excel '{current_month_name_pt}.xlsx' encontrado (mês anterior).")
-                df_excel_mes_vigente = data_loaders.carregar_multiplos_excel_de_pasta(
-                    [current_month_excel_filepath],
-                    list(config.MAPEAMENTO_EXCEL_BIGQUERY.keys()),
-                    config.MAPEAMENTO_EXCEL_BIGQUERY
-                )
-                df_excel_mes_vigente = add_missing_columns(
-                    df_excel_mes_vigente, all_possible_cols)
-                dfs_mes_vigente.append(df_excel_mes_vigente)
-                print(
-                    f"   - Excel do mês anterior carregado: {len(df_excel_mes_vigente)} linhas.")
-            else:
-                print(
-                    f"   - Nenhum Excel do mês anterior encontrado (normal no início do primeiro mês).")
-
         else:
-            # Qualquer outro dia: API busca ONTEM e HOJE
+            # Qualquer outro dia: API busca ONTEM e HOJE (e filtra o Excel do mês vigente)
             print(f"   📅 Dia {dia_do_mes} do mês detectado.")
 
             if os.path.exists(current_month_excel_filepath):
@@ -223,9 +235,9 @@ if __name__ == "__main__":
             df_vendas_current_month_source = pd.concat(
                 dfs_mes_vigente, ignore_index=True)
             print(
-                f"✅ Dados do mês vigente (Excel + API) consolidados. Total de linhas: {len(df_vendas_current_month_source)}")
+                f"✅ Dados do período recente (Excel do mês anterior + API de hoje) consolidados. Total de linhas: {len(df_vendas_current_month_source)}")
         else:
-            print("⚠️ Nenhum dado do mês vigente (Excel ou API) foi carregado.")
+            print("⚠️ Nenhum dado do período recente (Excel ou API) foi carregado.")
 
         # 3. Combinação final dos DataFrames
         print("\n🔄 Combinando DataFrames de vendas de todos os períodos...")

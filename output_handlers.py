@@ -1,9 +1,27 @@
 import pandas as pd
 from google.cloud import bigquery
 import decimal
+from decimal import Decimal, InvalidOperation # Importado para tratamento defensivo
 
 # Importa as configurações do arquivo config.py
 import config
+
+# Adicionado uma função auxiliar para garantir a formatação segura
+def _safe_format_decimal(x):
+    """Formata um Decimal para string, tratando NaT e outros não-Decimais como zero."""
+    if isinstance(x, decimal.Decimal):
+        return '{:.3f}'.format(x)
+    # Se for NaN/NaT, ou qualquer outra coisa que não seja um Decimal, trata como 0
+    if pd.isna(x) or x is None:
+        return '0.000'
+    
+    # Tenta converter para Decimal (como último recurso)
+    try:
+        # Tenta criar um Decimal a partir da string/objeto
+        return '{:.3f}'.format(Decimal(str(x).replace(',', '.')))
+    except:
+        # Em caso de falha na conversão (ex: string vazia ou lixo), retorna 0.000
+        return '0.000'
 
 def gerar_saida_markdown(df, arquivo_saida):
     """
@@ -21,10 +39,12 @@ def gerar_saida_markdown(df, arquivo_saida):
     # Formata colunas numéricas para 3 casas decimais
     for col in ['valor_total_produto', 'custo_total_produto', 'cashback_cupom', 'Comissão', 'custo_unitario']:
         if col in df_display_md.columns:
-            df_display_md[col] = df_display_md[col].astype(float).map('{:.3f}'.format)
+            # CORREÇÃO APLICADA: Usa a função de formatação segura
+            df_display_md[col] = df_display_md[col].apply(_safe_format_decimal)
 
     if 'valor_unitario_venda' in df_display_md.columns:
-        df_display_md['valor_unitario_venda'] = df_display_md['valor_unitario_venda'].astype(float).map('{:.3f}'.format)
+        # CORREÇÃO APLICADA: Usa a função de formatação segura
+        df_display_md['valor_unitario_venda'] = df_display_md['valor_unitario_venda'].apply(_safe_format_decimal)
 
     tabela_markdown = df_display_md.to_markdown(index=False)
     with open(arquivo_saida, 'w', encoding='utf-8') as f:
